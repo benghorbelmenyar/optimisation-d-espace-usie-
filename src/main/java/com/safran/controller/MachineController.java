@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
@@ -31,7 +32,8 @@ public class MachineController {
         return ResponseEntity.ok(machineService.findById(id));
     }
 
-    @PostMapping
+    @PostMapping    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+
     public ResponseEntity<?> create(@Valid @RequestBody MachineDTO dto) {
         log.info("Requête REST pour créer la machine : {}", dto.getNom());
         try {
@@ -44,6 +46,8 @@ public class MachineController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+
     public ResponseEntity<?> update(@PathVariable Long id, @Valid @RequestBody MachineDTO dto) {
         log.info("Requête REST pour modifier la machine ID: {}", id);
         try {
@@ -56,6 +60,8 @@ public class MachineController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         log.info("Requête REST pour supprimer la machine ID: {}", id);
         machineService.delete(id);

@@ -4,6 +4,7 @@ import com.safran.dto.LayoutDTO;
 import com.safran.service.LayoutService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -26,16 +27,22 @@ public class LayoutController {
     }
 
     @PostMapping("/usine/{usineId}/generer")
+    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+
     public ResponseEntity<LayoutDTO> genererPlacement(@PathVariable Long usineId) {
         return ResponseEntity.ok(layoutService.genererPlacement(usineId));
     }
 
     @PostMapping("/{id}/optimiser")
+    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+
     public ResponseEntity<LayoutDTO> optimiser(@PathVariable Long id) {
         return ResponseEntity.ok(layoutService.optimiser(id));
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         layoutService.delete(id);
         return ResponseEntity.noContent().build();

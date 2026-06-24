@@ -24,16 +24,22 @@ public class UtilisateurController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+
     public ResponseEntity<UtilisateurDTO> getById(@PathVariable Long id) {
         return ResponseEntity.ok(utilisateurService.findById(id));
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+
     public ResponseEntity<UtilisateurDTO> create(@Valid @RequestBody UtilisateurDTO dto) {
         return ResponseEntity.ok(utilisateurService.create(dto));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+
     public ResponseEntity<UtilisateurDTO> update(@PathVariable Long id, @Valid @RequestBody UtilisateurDTO dto) {
         return ResponseEntity.ok(utilisateurService.update(id, dto));
     }

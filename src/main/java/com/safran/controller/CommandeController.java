@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
@@ -20,24 +21,32 @@ public class CommandeController {
     private final CommandeService commandeService;
 
     @GetMapping
+    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+
     public ResponseEntity<List<CommandeDTO>> getAll() {
         log.info("Requête REST pour récupérer toutes les commandes");
         return ResponseEntity.ok(commandeService.findAll());
     }
 
     @GetMapping("/usine/{usineId}")
+    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+
     public ResponseEntity<List<CommandeDTO>> getByUsine(@PathVariable Long usineId) {
         log.info("Requête REST pour récupérer les commandes de l'usine ID: {}", usineId);
         return ResponseEntity.ok(commandeService.findAllByUsine(usineId));
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+
     public ResponseEntity<CommandeDTO> getById(@PathVariable Long id) {
         log.info("Requête REST pour récupérer la commande ID: {}", id);
         return ResponseEntity.ok(commandeService.findById(id));
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+
     public ResponseEntity<?> create(@Valid @RequestBody CommandeDTO dto) {
         log.info("Requête REST pour enregistrer une commande du client: {}", dto.getClient());
         try {
@@ -50,6 +59,8 @@ public class CommandeController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+
     public ResponseEntity<?> update(@PathVariable Long id, @Valid @RequestBody CommandeDTO dto) {
         log.info("Requête REST pour modifier la commande ID: {}", id);
         try {
@@ -62,6 +73,8 @@ public class CommandeController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         log.info("Requête REST pour supprimer la commande ID: {}", id);
         commandeService.delete(id);
@@ -69,12 +82,16 @@ public class CommandeController {
     }
 
     @GetMapping("/{id}/faisabilite")
+    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+
     public ResponseEntity<Boolean> verifierFaisabilite(@PathVariable Long id) {
         log.info("Requête REST pour exécuter l'algorithme de faisabilité de la commande ID: {}", id);
         return ResponseEntity.ok(commandeService.verifierFaisabilite(id));
     }
 
     @GetMapping("/{id}/capacite-requise")
+    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+
     public ResponseEntity<Double> getCapaciteRequise(@PathVariable Long id) {
         log.info("Requête REST pour obtenir la capacité requise pour la commande ID: {}", id);
         return ResponseEntity.ok(commandeService.calculerCapaciteRequise(id));

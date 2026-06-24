@@ -5,6 +5,7 @@ import com.safran.service.ZoneService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j; // 👈 Import pour les logs
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
@@ -40,18 +41,21 @@ public class ZoneController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMINISTRATEUR')")
     public ResponseEntity<ZoneDTO> create(@Valid @RequestBody ZoneDTO dto) {
         log.info("Requête REST pour créer une nouvelle zone : {}", dto.getNom());
         return ResponseEntity.ok(zoneService.create(dto));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMINISTRATEUR')")
     public ResponseEntity<ZoneDTO> update(@PathVariable Long id, @Valid @RequestBody ZoneDTO dto) {
         log.info("Requête REST pour modifier la zone ID: {}", id);
         return ResponseEntity.ok(zoneService.update(id, dto));
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMINISTRATEUR')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         log.info("Requête REST pour supprimer la zone ID: {}", id);
         zoneService.delete(id);

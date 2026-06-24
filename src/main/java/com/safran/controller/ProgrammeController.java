@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
@@ -32,6 +33,8 @@ public class ProgrammeController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+
     public ResponseEntity<?> create(@Valid @RequestBody ProgrammeDTO dto) {
         log.info("Requête REST pour créer le programme : {}", dto.getNom());
         try {
@@ -44,6 +47,8 @@ public class ProgrammeController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+
     public ResponseEntity<?> update(@PathVariable Long id, @Valid @RequestBody ProgrammeDTO dto) {
         log.info("Requête REST pour modifier le programme ID: {}", id);
         try {
@@ -56,6 +61,8 @@ public class ProgrammeController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         log.info("Requête REST pour supprimer le programme ID: {}", id);
         programmeService.delete(id);

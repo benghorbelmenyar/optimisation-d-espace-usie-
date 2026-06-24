@@ -6,6 +6,7 @@ import com.safran.service.ActiviteService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j; // 👈 Import pour les logs
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
@@ -40,19 +41,26 @@ public class ActiviteController {
         return ResponseEntity.ok(activiteService.findById(id));
     }
 
+
     @PostMapping
+    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+
     public ResponseEntity<ActiviteDTO> create(@Valid @RequestBody ActiviteDTO dto) {
         log.info("Requête REST pour créer une nouvelle activité : {}", dto.getNom());
         return ResponseEntity.ok(activiteService.create(dto));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+
     public ResponseEntity<ActiviteDTO> update(@PathVariable Long id, @Valid @RequestBody ActiviteDTO dto) {
         log.info("Requête REST pour modifier l'activité ID: {}", id);
         return ResponseEntity.ok(activiteService.update(id, dto));
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         log.info("Requête REST pour supprimer l'activité ID: {}", id);
         activiteService.delete(id);

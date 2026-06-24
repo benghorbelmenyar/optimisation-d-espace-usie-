@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -31,6 +32,8 @@ public class SimulationController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+
     public ResponseEntity<?> lancer(@RequestParam Long commandeId, @RequestParam Long utilisateurId) {
         log.info("Requête REST pour lancer une simulation");
         try {
@@ -43,6 +46,8 @@ public class SimulationController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         log.info("Requête REST pour supprimer la simulation ID: {}", id);
         simulationService.delete(id);

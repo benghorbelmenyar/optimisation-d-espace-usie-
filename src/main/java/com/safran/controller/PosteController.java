@@ -5,6 +5,7 @@ import com.safran.service.PosteService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j; // 👈 Pour les logs
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
@@ -40,18 +41,24 @@ public class PosteController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+
     public ResponseEntity<PosteDTO> create(@Valid @RequestBody PosteDTO dto) {
         log.info("Requête REST pour créer un poste : {}", dto.getNom());
         return ResponseEntity.ok(posteService.create(dto));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+
     public ResponseEntity<PosteDTO> update(@PathVariable Long id, @Valid @RequestBody PosteDTO dto) {
         log.info("Requête REST pour modifier le poste ID: {}", id);
         return ResponseEntity.ok(posteService.update(id, dto));
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         log.info("Requête REST pour supprimer le poste ID: {}", id);
         posteService.delete(id);

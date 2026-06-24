@@ -8,6 +8,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -26,6 +27,8 @@ public class RapportPDFController {
     }
 
     @PostMapping("/simulation/{simulationId}/generer")
+    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+
     public ResponseEntity<?> generer(@PathVariable Long simulationId) {
         log.info("Requête REST pour générer le rapport de la simulation ID: {}", simulationId);
         try {
