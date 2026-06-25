@@ -1,13 +1,17 @@
 package com.safran.service;
 
 import com.safran.dto.CommandeDTO;
+import com.safran.dto.BesoinCommandeDTO;
 import com.safran.entity.Commande;
-import com.safran.entity.Poste;
+import com.safran.entity.BesoinCommande;
 import com.safran.entity.Usine;
+import com.safran.entity.Processus;
+import com.safran.entity.Programme; // <-- Import de ton entité Programme
 import com.safran.enums.StatutCommande;
 import com.safran.repository.CommandeRepository;
-import com.safran.repository.PosteRepository;
 import com.safran.repository.UsineRepository;
+import com.safran.repository.ProcessusRepository;
+import com.safran.repository.ProgrammeRepository; // <-- Import du Repository
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,11 +26,10 @@ import java.util.stream.Collectors;
 @Slf4j
 public class CommandeService {
 
-    private static final double HEURES_PAR_EMPLOYE_AN = 1850.0;
-
     private final CommandeRepository commandeRepository;
-    private final PosteRepository posteRepository;
     private final UsineRepository usineRepository;
+    private final ProcessusRepository processusRepository;
+    private final ProgrammeRepository programmeRepository; // <-- Injection obligatoire
 
     public List<CommandeDTO> findAll() {
         log.debug("Appel de findAll() dans CommandeService");
@@ -53,138 +56,120 @@ public class CommandeService {
     public CommandeDTO create(CommandeDTO dto) {
         log.info("[VALIDATION] Vérification de l'existence de l'usine ID: {}", dto.getUsineId());
 
-        // 🛡️ BLOCAGE STRICT : Vérification immédiate avant conversion ou persistance
         if (dto.getUsineId() == null || !usineRepository.existsById(dto.getUsineId())) {
-            log.error("[BLOQUÉ] Impossible de créer la commande. L'usine ID {} n'existe pas.", dto.getUsineId());
-            throw new IllegalArgumentException("Impossible de créer la commande : l'usine spécifiée avec l'ID " + dto.getUsineId() + " n'existe pas.");
+            throw new IllegalArgumentException("Impossible de créer la commande : l'usine spécifiée n'existe pas.");
         }
 
-        Commande commande = toEntity(dto);
-        commande.setDateCommande(LocalDate.now());
-        commande.setStatut(StatutCommande.EN_ATTENTE);
+        // Récupération sécurisée du Programme à partir de son nom ou de son ID
+        // Si ton DTO utilise une String pour le nom (ex: "Programme LEAP Moteurs"), on le cherche par son nom
+        Programme programme = programmeRepository.findByNom(dto.getProgrammeAvion())
+                .orElseThrow(() -> new IllegalArgumentException("Le programme aéronautique '" + dto.getProgrammeAvion() + "' n'existe pas."));
+
+        // 1. Convertir les informations globales de la commande
+        Commande commande = Commande.builder()
+                .usine(usineRepository.findById(dto.getUsineId()).get())
+                .client(dto.getClient())
+                .programmeAvion(programme) // <-- FIX : On passe l'entité Programme, plus une String !
+                .dateCommande(LocalDate.now())
+                .dateLivraisonSouhaitee(dto.getDateLivraisonSouhaitee())
+                .statut(StatutCommande.EN_ATTENTE)
+                .build();
+
+        // 2. Associer chaque ligne de besoin (Soudure, Cintrage...) passée dans le DTO
+        if (dto.getBesoins() != null) {
+            List<BesoinCommande> besoinsEntities = dto.getBesoins().stream().map(besoinDto -> {
+                Processus proc = processusRepository.findById(besoinDto.getProcessusId())
+                        .orElseThrow(() -> new IllegalArgumentException("Le processus ID " + besoinDto.getProcessusId() + " n'existe pas."));
+
+                return BesoinCommande.builder()
+                        .commande(commande)
+                        .processus(proc)
+                        .heuresDemandees(besoinDto.getHeuresDemandees())
+                        .build();
+            }).collect(Collectors.toList());
+
+            commande.setBesoins(besoinsEntities);
+        }
 
         Commande savedCommande = commandeRepository.save(commande);
-        log.info("[SUCCÈS] Commande ID {} créée pour l'usine ID {}", savedCommande.getId(), commande.getUsine().getId());
+        log.info("[SUCCÈS] Commande globale ID {} créée.", savedCommande.getId());
         return toDTO(savedCommande);
     }
 
     @Transactional
     public CommandeDTO update(Long id, CommandeDTO dto) {
         Commande commande = commandeRepository.findById(id)
-                .orElseThrow(() -> {
-                    log.error("Échec modification : Commande ID {} introuvable", id);
-                    return new RuntimeException("Commande non trouvée avec id : " + id);
-                });
+                .orElseThrow(() -> new RuntimeException("Commande non trouvée avec id : " + id));
 
         log.info("Mise à jour de la commande ID {}.", id);
 
-        // 🛡️ BLOCAGE STRICT SUR LE PUT : Vérification de la nouvelle usine s'il y a un changement
-        Long currentUsineId = (commande.getUsine() != null) ? commande.getUsine().getId() : null;
-        if (dto.getUsineId() != null && !dto.getUsineId().equals(currentUsineId)) {
-            if (!usineRepository.existsById(dto.getUsineId())) {
-                log.error("[BLOQUÉ] Impossible de modifier la commande. La nouvelle usine ID {} n'existe pas.", dto.getUsineId());
-                throw new IllegalArgumentException("Impossible de modifier la commande : la nouvelle usine spécifiée avec l'ID " + dto.getUsineId() + " n'existe pas.");
-            }
-            Usine nouvelleUsine = usineRepository.findById(dto.getUsineId()).get();
+        if (dto.getUsineId() != null) {
+            Usine nouvelleUsine = usineRepository.findById(dto.getUsineId())
+                    .orElseThrow(() -> new IllegalArgumentException("L'usine spécifiée n'existe pas."));
             commande.setUsine(nouvelleUsine);
         }
 
+        if (dto.getProgrammeAvion() != null) {
+            Programme programme = programmeRepository.findByNom(dto.getProgrammeAvion())
+                    .orElseThrow(() -> new IllegalArgumentException("Le programme spécifié n'existe pas."));
+            commande.setProgrammeAvion(programme); // <-- FIX : Modification propre
+        }
+
         commande.setClient(dto.getClient());
-        commande.setQuantiteDemandee(dto.getQuantiteDemandee());
         commande.setDateLivraisonSouhaitee(dto.getDateLivraisonSouhaitee());
 
         if (dto.getStatut() != null) {
             commande.setStatut(dto.getStatut());
         }
 
+        if (dto.getBesoins() != null) {
+            commande.getBesoins().clear();
+            List<BesoinCommande> nouveauxBesoins = dto.getBesoins().stream().map(besoinDto -> {
+                Processus proc = processusRepository.findById(besoinDto.getProcessusId())
+                        .orElseThrow(() -> new IllegalArgumentException("Processus non trouvé"));
+                return BesoinCommande.builder()
+                        .commande(commande)
+                        .processus(proc)
+                        .heuresDemandees(besoinDto.getHeuresDemandees())
+                        .build();
+            }).collect(Collectors.toList());
+            commande.getBesoins().addAll(nouveauxBesoins);
+        }
+
         Commande updatedCommande = commandeRepository.save(commande);
-        log.info("Commande ID {} modifiée avec succès.", id);
         return toDTO(updatedCommande);
     }
 
     public void delete(Long id) {
         if (!commandeRepository.existsById(id)) {
-            log.error("Impossible de supprimer : la commande ID {} n'existe pas", id);
             throw new RuntimeException("Commande introuvable");
         }
         commandeRepository.deleteById(id);
         log.info("Commande ID {} supprimée définitivement.", id);
     }
 
-    public double calculerCapaciteRequise(Long commandeId) {
-        Commande commande = commandeRepository.findById(commandeId)
-                .orElseThrow(() -> new RuntimeException("Commande non trouvée"));
-
-        Long usineId = commande.getUsine() != null ? commande.getUsine().getId() : null;
-        List<Poste> postes = posteRepository.findByUsineId(usineId);
-        if (postes.isEmpty()) return 0;
-
-        double cycleTimeMax = postes.stream()
-                .mapToDouble(Poste::getCycleTime)
-                .max().orElse(0);
-
-        return (cycleTimeMax * commande.getQuantiteDemandee()) / 3600.0;
-    }
-
-    @Transactional
-    public boolean verifierFaisabilite(Long commandeId) {
-        double capaciteRequise = calculerCapaciteRequise(commandeId);
-        Commande commande = commandeRepository.findById(commandeId)
-                .orElseThrow(() -> new RuntimeException("Commande non trouvée"));
-
-        Long usineId = commande.getUsine() != null ? commande.getUsine().getId() : null;
-        List<Poste> postes = posteRepository.findByUsineId(usineId);
-
-        double capaciteDisponible = postes.stream()
-                .mapToDouble(p -> (3600.0 / p.getCycleTime()) * p.getNombreOperateurs())
-                .min().orElse(0);
-
-        boolean faisable = capaciteDisponible >= capaciteRequise;
-        commande.setStatut(faisable ? StatutCommande.VALIDEE : StatutCommande.REFUSEE);
-        commandeRepository.save(commande);
-
-        log.info("Algorithme de faisabilité appliqué pour la commande ID {}. Résultat : {}", commandeId, commande.getStatut());
-        return faisable;
-    }
-
-    /** Formules RH du cahier des charges (1850h/employé/an) */
-    public int calculerEmployesAAjouter(double heuresDemandees, int nombreEmployesActuels) {
-        double heuresDisponibles = nombreEmployesActuels * HEURES_PAR_EMPLOYE_AN;
-        double ecart = heuresDemandees - heuresDisponibles;
-        if (ecart <= 0) return 0;
-        return (int) Math.ceil(ecart / HEURES_PAR_EMPLOYE_AN);
-    }
-
-    public int calculerEmployesARetirer(double heuresDemandees, int nombreEmployesActuels) {
-        double heuresDisponibles = nombreEmployesActuels * HEURES_PAR_EMPLOYE_AN;
-        double surplus = heuresDisponibles - heuresDemandees;
-        if (surplus <= 0) return 0;
-        return (int) Math.floor(surplus / HEURES_PAR_EMPLOYE_AN);
-    }
-
-    // --- MAPPERS PRIVÉS ---
-
     private CommandeDTO toDTO(Commande c) {
+        List<BesoinCommandeDTO> besoinsDtos = null;
+        if (c.getBesoins() != null) {
+            besoinsDtos = c.getBesoins().stream().map(b -> BesoinCommandeDTO.builder()
+                    .processusId(b.getProcessus() != null ? b.getProcessus().getId() : null)
+                    .heuresDemandees(b.getHeuresDemandees())
+                    .build()
+            ).collect(Collectors.toList());
+        }
+
+        // On extrait le nom textuel du programme pour que le DTO reste inchangé à l'extérieur
+        String nomProgramme = c.getProgrammeAvion() != null ? c.getProgrammeAvion().getNom() : null;
+
         return CommandeDTO.builder()
                 .id(c.getId())
                 .usineId(c.getUsine() != null ? c.getUsine().getId() : null)
+                .programmeAvion(nomProgramme) // <-- FIX : On extrait la string attendue par le builder du DTO
                 .statut(c.getStatut())
                 .client(c.getClient())
-                .quantiteDemandee(c.getQuantiteDemandee())
                 .dateCommande(c.getDateCommande())
                 .dateLivraisonSouhaitee(c.getDateLivraisonSouhaitee())
-                .build();
-    }
-
-    private Commande toEntity(CommandeDTO dto) {
-        Usine usine = usineRepository.findById(dto.getUsineId())
-                .orElseThrow(() -> new RuntimeException("Usine non trouvée avec l'id : " + dto.getUsineId()));
-
-        return Commande.builder()
-                .usine(usine)
-                .client(dto.getClient())
-                .quantiteDemandee(dto.getQuantiteDemandee())
-                .dateLivraisonSouhaitee(dto.getDateLivraisonSouhaitee())
+                .besoins(besoinsDtos)
                 .build();
     }
 }

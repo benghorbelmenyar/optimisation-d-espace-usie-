@@ -8,15 +8,19 @@ import java.time.LocalDateTime;
 @Table(name = "simulation")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class Simulation {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // 🔗 Vraie relation avec l'entité Commande
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "commande_id", nullable = false)
-    private Commande commande;
+    @JoinColumn(name = "usine_id", nullable = false)
+    private Usine usine;
 
-    // 🔗 Vraie relation avec l'entité Utilisateur
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "processus_id", nullable = false)
+    private Processus processus;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "utilisateur_id", nullable = false)
     private Utilisateur utilisateur;
@@ -24,15 +28,27 @@ public class Simulation {
     @Column(name = "date_simulation")
     private LocalDateTime dateSimulation;
 
-    @Column(name = "capacite_calculee")
-    private float capaciteCalculee;
+    @Column(name = "heures_demandees")
+    private float heuresDemandees;
+
+    @Column(name = "heures_disponibles_actuelles")
+    private float heuresDisponiblesActuelles;
+
+    @Column(name = "operateurs_actuels")
+    private int operateursActuels;
+
+    // 👇 CES TROIS LIGNES VONT CORRIGER TON ERREUR 500 👇
+    @Column(name = "operateurs_a_ajouter")
+    private int operateursAAjouter;
+
+    @Column(name = "operateurs_a_retirer")
+    private int operateursARetirer;
+
+    @Column(name = "taux_charge_processus")
+    private float tauxChargeProcessus;
 
     private boolean faisabilite;
 
-    @Column(name = "poste_goulot")
-    private String posteGoulot;
-
-    @Lob
-    @Column(name = "solution_proposee")
+    @Column(name = "solution_proposee", length = 500)
     private String solutionProposee;
 }
