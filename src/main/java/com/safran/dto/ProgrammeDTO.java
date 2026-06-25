@@ -2,6 +2,7 @@ package com.safran.dto;
 
 import lombok.*;
 import java.time.LocalDate;
+import java.util.List; // 👈 Ajoute cet import
 
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class ProgrammeDTO {
@@ -10,5 +11,7 @@ public class ProgrammeDTO {
     private String nom;
     private String description;
     private LocalDate dateCreation;
-    private String processus;
+
+    // 🔄 MODIFICATION : Remplacement du type String par List<Long>
+    private List<Long> processusIds;
 }

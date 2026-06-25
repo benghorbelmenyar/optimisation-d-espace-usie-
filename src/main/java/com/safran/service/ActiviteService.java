@@ -105,18 +105,21 @@ public class ActiviteService {
         log.info("Activité ID {} supprimée de la base de données", id);
     }
 
+    // Remplace la méthode listerProgrammes dans ton ActiviteService par celle-ci :
+
     public List<ProgrammeDTO> listerProgrammes(Long activiteId) {
         log.debug("Récupération des programmes pour l'activité ID: {}", activiteId);
         return programmeRepository.findByActiviteId(activiteId)
                 .stream()
                 .map(p -> ProgrammeDTO.builder()
                         .id(p.getId())
-                        // 🛡️ CORRECTION : Récupération via le nouvel objet de relation
                         .activiteId(p.getActivite() != null ? p.getActivite().getId() : null)
                         .nom(p.getNom())
                         .description(p.getDescription())
                         .dateCreation(p.getDateCreation())
-                        .processus(p.getProcessus())
+                        // 🛡️ FIX : On extrait la liste des IDs des processus associés au programme
+                        .processusIds(p.getProcessus() != null ?
+                                p.getProcessus().stream().map(proc -> proc.getId()).collect(Collectors.toList()) : null)
                         .build())
                 .collect(Collectors.toList());
     }

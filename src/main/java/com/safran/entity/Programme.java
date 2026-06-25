@@ -3,6 +3,7 @@ package com.safran.entity;
 import lombok.*;
 import javax.persistence.*;
 import java.time.LocalDate;
+import java.util.List;
 
 @Entity
 @Table(name = "programme")
@@ -24,5 +25,6 @@ public class Programme {
     @Column(name = "date_creation")
     private LocalDate dateCreation;
 
-    private String processus;
+    @ManyToMany(mappedBy = "programmes", fetch = FetchType.LAZY)
+    private List<Processus> processus;
 }

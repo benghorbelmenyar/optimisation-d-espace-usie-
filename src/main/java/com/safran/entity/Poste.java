@@ -32,4 +32,7 @@ public class Poste {
     @Enumerated(EnumType.STRING)
     @Column(name = "statut_couleur")
     private StatutCouleur statutCouleur;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "processus_id")
+    private Processus processus;
 }
