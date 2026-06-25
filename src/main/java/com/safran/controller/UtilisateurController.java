@@ -18,34 +18,34 @@ public class UtilisateurController {
     private final UtilisateurService utilisateurService;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION')")
     public ResponseEntity<List<UtilisateurDTO>> getAll() {
         return ResponseEntity.ok(utilisateurService.findAll());
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION')")
 
     public ResponseEntity<UtilisateurDTO> getById(@PathVariable Long id) {
         return ResponseEntity.ok(utilisateurService.findById(id));
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION')")
 
     public ResponseEntity<UtilisateurDTO> create(@Valid @RequestBody UtilisateurDTO dto) {
         return ResponseEntity.ok(utilisateurService.create(dto));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION')")
 
     public ResponseEntity<UtilisateurDTO> update(@PathVariable Long id, @Valid @RequestBody UtilisateurDTO dto) {
         return ResponseEntity.ok(utilisateurService.update(id, dto));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         utilisateurService.delete(id);
         return ResponseEntity.noContent().build();

@@ -33,7 +33,7 @@ public class ProcessusController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION')")
 
     public ResponseEntity<ProcessusDTO> create(@Valid @RequestBody ProcessusDTO dto) {
         log.info("Appel REST pour créer un processus");
@@ -41,7 +41,7 @@ public class ProcessusController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION')")
 
     public ResponseEntity<ProcessusDTO> update(@PathVariable Long id, @Valid @RequestBody ProcessusDTO dto) {
         log.info("Appel REST pour modifier le processus ID : {}", id);
@@ -49,7 +49,7 @@ public class ProcessusController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION')")
 
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         log.info("Appel REST pour supprimer le processus ID : {}", id);

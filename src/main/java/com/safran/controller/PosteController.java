@@ -41,7 +41,7 @@ public class PosteController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION')")
 
     public ResponseEntity<PosteDTO> create(@Valid @RequestBody PosteDTO dto) {
         log.info("Requête REST pour créer un poste : {}", dto.getNom());
@@ -49,7 +49,7 @@ public class PosteController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION')")
 
     public ResponseEntity<PosteDTO> update(@PathVariable Long id, @Valid @RequestBody PosteDTO dto) {
         log.info("Requête REST pour modifier le poste ID: {}", id);
@@ -57,7 +57,7 @@ public class PosteController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION')")
 
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         log.info("Requête REST pour supprimer le poste ID: {}", id);

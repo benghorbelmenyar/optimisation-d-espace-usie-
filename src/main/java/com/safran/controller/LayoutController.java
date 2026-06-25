@@ -27,21 +27,21 @@ public class LayoutController {
     }
 
     @PostMapping("/usine/{usineId}/generer")
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION')")
 
     public ResponseEntity<LayoutDTO> genererPlacement(@PathVariable Long usineId) {
         return ResponseEntity.ok(layoutService.genererPlacement(usineId));
     }
 
     @PostMapping("/{id}/optimiser")
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION')")
 
     public ResponseEntity<LayoutDTO> optimiser(@PathVariable Long id) {
         return ResponseEntity.ok(layoutService.optimiser(id));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION')")
 
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         layoutService.delete(id);

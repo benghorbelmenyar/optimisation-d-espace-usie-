@@ -33,7 +33,7 @@ public class ProgrammeController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION')")
 
     public ResponseEntity<?> create(@Valid @RequestBody ProgrammeDTO dto) {
         log.info("Requête REST pour créer le programme : {}", dto.getNom());
@@ -47,7 +47,7 @@ public class ProgrammeController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION')")
 
     public ResponseEntity<?> update(@PathVariable Long id, @Valid @RequestBody ProgrammeDTO dto) {
         log.info("Requête REST pour modifier le programme ID: {}", id);
@@ -61,7 +61,7 @@ public class ProgrammeController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION')")
 
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         log.info("Requête REST pour supprimer le programme ID: {}", id);

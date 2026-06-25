@@ -43,7 +43,7 @@ public class ActiviteController {
 
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION')")
 
     public ResponseEntity<ActiviteDTO> create(@Valid @RequestBody ActiviteDTO dto) {
         log.info("Requête REST pour créer une nouvelle activité : {}", dto.getNom());
@@ -51,7 +51,7 @@ public class ActiviteController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION')")
 
     public ResponseEntity<ActiviteDTO> update(@PathVariable Long id, @Valid @RequestBody ActiviteDTO dto) {
         log.info("Requête REST pour modifier l'activité ID: {}", id);
@@ -59,7 +59,7 @@ public class ActiviteController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION')")
 
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         log.info("Requête REST pour supprimer l'activité ID: {}", id);

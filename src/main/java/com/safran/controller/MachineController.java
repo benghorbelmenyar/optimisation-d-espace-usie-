@@ -32,7 +32,8 @@ public class MachineController {
         return ResponseEntity.ok(machineService.findById(id));
     }
 
-    @PostMapping    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PostMapping
+    @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION')")
 
     public ResponseEntity<?> create(@Valid @RequestBody MachineDTO dto) {
         log.info("Requête REST pour créer la machine : {}", dto.getNom());
@@ -46,7 +47,7 @@ public class MachineController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION')")
 
     public ResponseEntity<?> update(@PathVariable Long id, @Valid @RequestBody MachineDTO dto) {
         log.info("Requête REST pour modifier la machine ID: {}", id);
@@ -60,7 +61,7 @@ public class MachineController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION')")
 
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         log.info("Requête REST pour supprimer la machine ID: {}", id);

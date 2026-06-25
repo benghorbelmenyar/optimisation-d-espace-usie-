@@ -39,7 +39,7 @@ public class ContrainteController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION')")
 
     public ResponseEntity<ContrainteDTO> create(@Valid @RequestBody ContrainteDTO dto) {
         log.info("Requête REST pour créer une contrainte");
@@ -47,7 +47,7 @@ public class ContrainteController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION')")
 
     public ResponseEntity<ContrainteDTO> update(@PathVariable Long id, @Valid @RequestBody ContrainteDTO dto) {
         log.info("Requête REST pour modifier la contrainte ID: {}", id);
@@ -55,7 +55,7 @@ public class ContrainteController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION')")
 
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         log.info("Requête REST pour supprimer la contrainte ID: {}", id);

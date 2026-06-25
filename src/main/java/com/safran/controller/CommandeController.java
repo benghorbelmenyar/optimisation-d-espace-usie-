@@ -59,7 +59,7 @@ public class CommandeController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION')")
 
     public ResponseEntity<?> update(@PathVariable Long id, @Valid @RequestBody CommandeDTO dto) {
         log.info("Requête REST pour modifier la commande ID: {}", id);
@@ -73,7 +73,7 @@ public class CommandeController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION')")
 
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         log.info("Requête REST pour supprimer la commande ID: {}", id);
@@ -82,7 +82,7 @@ public class CommandeController {
     }
 
     @GetMapping("/{id}/faisabilite")
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION')")
 
     public ResponseEntity<Boolean> verifierFaisabilite(@PathVariable Long id) {
         log.info("Requête REST pour exécuter l'algorithme de faisabilité de la commande ID: {}", id);
@@ -90,7 +90,7 @@ public class CommandeController {
     }
 
     @GetMapping("/{id}/capacite-requise")
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION')")
 
     public ResponseEntity<Double> getCapaciteRequise(@PathVariable Long id) {
         log.info("Requête REST pour obtenir la capacité requise pour la commande ID: {}", id);

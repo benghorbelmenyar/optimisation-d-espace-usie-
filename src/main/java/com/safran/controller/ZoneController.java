@@ -41,21 +41,21 @@ public class ZoneController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION')")
     public ResponseEntity<ZoneDTO> create(@Valid @RequestBody ZoneDTO dto) {
         log.info("Requête REST pour créer une nouvelle zone : {}", dto.getNom());
         return ResponseEntity.ok(zoneService.create(dto));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION')")
     public ResponseEntity<ZoneDTO> update(@PathVariable Long id, @Valid @RequestBody ZoneDTO dto) {
         log.info("Requête REST pour modifier la zone ID: {}", id);
         return ResponseEntity.ok(zoneService.update(id, dto));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         log.info("Requête REST pour supprimer la zone ID: {}", id);
         zoneService.delete(id);

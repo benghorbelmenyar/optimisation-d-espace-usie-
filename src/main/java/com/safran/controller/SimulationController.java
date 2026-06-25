@@ -32,7 +32,7 @@ public class SimulationController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION')")
 
     public ResponseEntity<?> lancer(@RequestParam Long commandeId, @RequestParam Long utilisateurId) {
         log.info("Requête REST pour lancer une simulation");
@@ -46,7 +46,7 @@ public class SimulationController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION')")
 
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         log.info("Requête REST pour supprimer la simulation ID: {}", id);

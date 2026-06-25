@@ -27,7 +27,7 @@ public class RapportPDFController {
     }
 
     @PostMapping("/simulation/{simulationId}/generer")
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION')")
 
     public ResponseEntity<?> generer(@PathVariable Long simulationId) {
         log.info("Requête REST pour générer le rapport de la simulation ID: {}", simulationId);
