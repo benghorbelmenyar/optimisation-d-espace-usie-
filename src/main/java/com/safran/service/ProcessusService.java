@@ -3,8 +3,10 @@ package com.safran.service;
 import com.safran.dto.ProcessusDTO;
 import com.safran.entity.Processus;
 import com.safran.entity.Programme;
+import com.safran.entity.Zone; // 👈 FIX 1 : Importation de l'entité Zone manquante
 import com.safran.repository.ProcessusRepository;
 import com.safran.repository.ProgrammeRepository;
+import com.safran.repository.ZoneRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -20,12 +22,15 @@ public class ProcessusService {
 
     private final ProcessusRepository processusRepository;
     private final ProgrammeRepository programmeRepository;
+    private final ZoneRepository zoneRepository;
 
+    @Transactional(readOnly = true)
     public List<ProcessusDTO> findAll() {
         return processusRepository.findAll()
                 .stream().map(this::toDTO).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public ProcessusDTO findById(Long id) {
         return processusRepository.findById(id)
                 .map(this::toDTO)
@@ -34,23 +39,24 @@ public class ProcessusService {
 
     @Transactional
     public ProcessusDTO create(ProcessusDTO dto) {
-        log.info("Création du processus : {}", dto.getNom());
-        Processus processus = Processus.builder()
-                .nom(dto.getNom())
-                .tempsUnitaire(dto.getTempsUnitaire())
-                .typeP(dto.getTypeP())
-                .quantite(dto.getQuantite())
-                .nombreOperateurs(dto.getNombreOperateurs())
-                .tauxCharge(dto.getTauxCharge())
-                .build();
+        log.info("Création d'un nouveau processus : {}", dto.getNom());
+        Processus processus = new Processus();
+        processus.setNom(dto.getNom());
+        processus.setTempsUnitaire(dto.getTempsUnitaire());
+        processus.setTypeP(dto.getTypeP());
+        processus.setQuantite(dto.getQuantite());
+        processus.setNombreOperateurs(dto.getNombreOperateurs());
+        processus.setTauxCharge(dto.getTauxCharge());
 
-        // Gestion de la relation ManyToMany à la création
-        if (dto.getProgrammeIds() != null && !dto.getProgrammeIds().isEmpty()) {
-            List<Programme> programmes = programmeRepository.findAllById(dto.getProgrammeIds());
-            processus.setProgrammes(programmes);
+        // ⚙️ FIX 2 : Liaison sécurisée avec la Zone (Plus de doublons, plus de NULL)
+        if (dto.getZoneId() != null) {
+            Zone zone = zoneRepository.findById(dto.getZoneId())
+                    .orElseThrow(() -> new IllegalArgumentException("La zone avec l'ID " + dto.getZoneId() + " n'existe pas."));
+            processus.setZone(zone);
         }
 
-        return toDTO(processusRepository.save(processus));
+        Processus savedProcessus = processusRepository.save(processus);
+        return toDTO(savedProcessus);
     }
 
     @Transactional
@@ -66,7 +72,15 @@ public class ProcessusService {
         processus.setNombreOperateurs(dto.getNombreOperateurs());
         processus.setTauxCharge(dto.getTauxCharge());
 
-        // Mise à jour de la relation ManyToMany
+        // Mise à jour de la relation avec la Zone lors du PUT
+        if (dto.getZoneId() != null) {
+            Zone zone = zoneRepository.findById(dto.getZoneId())
+                    .orElseThrow(() -> new IllegalArgumentException("La zone spécifiée n'existe pas."));
+            processus.setZone(zone);
+        } else {
+            processus.setZone(null);
+        }
+
         if (dto.getProgrammeIds() != null) {
             List<Programme> programmes = programmeRepository.findAllById(dto.getProgrammeIds());
             processus.setProgrammes(programmes);
@@ -95,6 +109,7 @@ public class ProcessusService {
                 .nombreOperateurs(p.getNombreOperateurs())
                 .tauxCharge(p.getTauxCharge())
                 .programmeIds(pIds)
+                .zoneId(p.getZone() != null ? p.getZone().getId() : null) // 👈 FIX 3 : Mapping retour de la zone
                 .build();
     }
 }

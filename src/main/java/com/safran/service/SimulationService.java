@@ -26,7 +26,8 @@ public class SimulationService {
     private final CommandeRepository commandeRepository;
     private final UtilisateurRepository utilisateurRepository;
     private final UsineRepository usineRepository;
-    private final ProcessusRepository processusRepository; // <-- À AJOUTER
+    private final ProcessusRepository processusRepository;
+    private final ZoneService zoneService;
 
     @Transactional(readOnly = true)
     public List<SimulationDTO> findAllByUsine(Long usineId) {
@@ -41,12 +42,9 @@ public class SimulationService {
                 .orElseThrow(() -> new RuntimeException("Simulation non trouvée avec id : " + id));
     }
 
-    /**
-     * Lance la simulation globale dynamique basée sur le portefeuille de commandes de l'usine.
-     */
     @Transactional
     public List<SimulationDTO> lancerSimulationDynamiqueParProcessus(Long usineId, Long utilisateurId, int quantite, UniteTemps unite, Long processusId) {
-        log.info("[SIMULATION] Analyse Processus: {} pour l'Usine: {}", processusId, usineId);
+        log.info("[SIMULATION] Analyse Charge & Espace automatique pour Processus: {}", processusId);
 
         Usine usine = usineRepository.findById(usineId)
                 .orElseThrow(() -> new IllegalArgumentException("L'usine spécifiée n'existe pas."));
@@ -75,7 +73,6 @@ public class SimulationService {
                 break;
         }
 
-        // 1. Récupérer les commandes de l'usine sur la bonne période
         List<Commande> commandesPortefeuille = commandeRepository.findByUsineId(usineId).stream()
                 .filter(c -> c.getStatut() == StatutCommande.EN_ATTENTE || c.getStatut() == StatutCommande.VALIDEE)
                 .filter(c -> c.getDateLivraisonSouhaitee() != null &&
@@ -83,7 +80,6 @@ public class SimulationService {
                         !c.getDateLivraisonSouhaitee().isAfter(fin))
                 .collect(Collectors.toList());
 
-        // 2. Filtrer les lignes de besoins qui concernent uniquement le processus demandé
         List<BesoinCommande> besoinsDuProcessus = commandesPortefeuille.stream()
                 .filter(c -> c.getBesoins() != null)
                 .flatMap(c -> c.getBesoins().stream())
@@ -94,28 +90,22 @@ public class SimulationService {
             throw new IllegalStateException("Aucun besoin trouvé pour le processus [" + processus.getNom() + "] dans cette période.");
         }
 
-        // 3. Récupérer la liste des programmes avions impactés (A320, A350...)
-        // Note : On remonte à la commande depuis le besoin. Si ton entité BesoinCommande possède un champ 'commande', assure-toi qu'elle a le @Getter de Lombok.
-        // 3. Récupérer la liste des programmes avions impactés (A320, A350...)
         String programmesConcernes = commandesPortefeuille.stream()
                 .filter(c -> c.getBesoins().stream().anyMatch(b -> b.getProcessus().getId().equals(processusId)))
                 .map(Commande::getProgrammeAvion)
-                .filter(p -> p != null) // Sécurité anti-NullPointerException
-                .map(Programme::getNom) // <-- Extraction du nom du programme (String)
+                .filter(p -> p != null)
+                .map(Programme::getNom)
                 .distinct()
                 .collect(Collectors.joining(", "));
 
-        // 4. Cumul des charges horaires demandées
         float totalHeuresDemandees = (float) besoinsDuProcessus.stream()
                 .mapToDouble(BesoinCommande::getHeuresDemandees)
                 .sum();
 
-        // 5. Calcul capacitaire (Postes / Opérateurs)
         int postesActuels = processus.getNombreOperateurs();
         float hDispoParPoste = 1840f * facteurTemps;
         float hDispoTotale = postesActuels * hDispoParPoste;
 
-        // Combien de postes théoriques requis pour absorber la charge
         int postesRequis = (int) Math.ceil(totalHeuresDemandees / hDispoParPoste);
 
         int postesAAjouter = 0;
@@ -124,10 +114,36 @@ public class SimulationService {
         String solution;
 
         if (totalHeuresDemandees > hDispoTotale) {
-            faisable = false;
             postesAAjouter = postesRequis - postesActuels;
-            solution = String.format("SATURATION [%s] : Programmes: %s. Charge cumulée de %.1f h. Capacité actuelle: %.1f h. Il faut AJOUTER %d poste(s).",
-                    processus.getNom(), programmesConcernes, totalHeuresDemandees, hDispoTotale, postesAAjouter);
+
+            Zone zonePhysique = processus.getZone();
+
+            if (zonePhysique != null) {
+                // ⚙️ RÉCUPÉRATION DEPUIS LA TABLE ZONE
+                float surfaceParPoste = zonePhysique.getSurfaceRequiseParPoste();
+
+                if (surfaceParPoste <= 0) {
+                    throw new IllegalStateException("La métrique 'surface_requise_par_poste' n'est pas configurée pour la zone '" + zonePhysique.getNom() + "'.");
+                }
+
+                float surfaceTotaleRequisePourAjout = postesAAjouter * surfaceParPoste;
+                float surfaceDisponibleDansZone = zoneService.calculerSurfaceDisponible(zonePhysique.getId());
+
+                if (surfaceTotaleRequisePourAjout > surfaceDisponibleDansZone) {
+                    faisable = false;
+                    solution = String.format("SATURATION PHYSIQUE [%s] : Programmes: %s. Il faut AJOUTER %d poste(s) requérant %.1f m² (Config Zone: %.1f m²/poste), mais la zone '%s' ne dispose que de %.1f m² de libre. Déploiement impossible !",
+                            processus.getNom(), programmesConcernes, postesAAjouter, surfaceTotaleRequisePourAjout, surfaceParPoste, zonePhysique.getNom(), surfaceDisponibleDansZone);
+                } else {
+                    faisable = false;
+                    solution = String.format("SATURATION CAPACITAIRE [%s] : Programmes: %s. Il faut AJOUTER %d poste(s) (Empreinte requise: %.1f m²). Espace disponible suffisant dans la zone '%s' (%.1f m² libre(s)). Extension possible.",
+                            processus.getNom(), programmesConcernes, postesAAjouter, surfaceTotaleRequisePourAjout, zonePhysique.getNom(), surfaceDisponibleDansZone);
+                }
+            } else {
+                faisable = false;
+                solution = String.format("SATURATION [%s] : Programmes: %s. Il faut AJOUTER %d poste(s). Aucune zone physique n'est affectée à ce processus.",
+                        processus.getNom(), programmesConcernes, postesAAjouter);
+            }
+
         } else {
             postesARetirer = postesActuels - postesRequis;
             if (postesARetirer > 0) {
@@ -158,7 +174,6 @@ public class SimulationService {
 
         Simulation saved = simulationRepository.save(simulation);
 
-        // FIX JAVA 8 : Remplacer List.of par java.util.Arrays.asList
         return java.util.Arrays.asList(toDTO(saved));
     }
 
@@ -170,7 +185,6 @@ public class SimulationService {
         simulationRepository.deleteById(id);
     }
 
-    // --- MAPPER PRIVÉ ---
     private SimulationDTO toDTO(Simulation s) {
         if (s == null) return null;
 

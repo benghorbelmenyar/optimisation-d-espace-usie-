@@ -5,8 +5,8 @@ import com.safran.entity.Machine;
 import com.safran.entity.Usine;
 import com.safran.entity.Zone;
 import com.safran.repository.MachineRepository;
-import com.safran.repository.UsineRepository; // 👈 Injection requise
-import com.safran.repository.ZoneRepository;  // 👈 Injection requise
+import com.safran.repository.UsineRepository;
+import com.safran.repository.ZoneRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -23,6 +23,7 @@ public class MachineService {
     private final MachineRepository machineRepository;
     private final UsineRepository usineRepository;
     private final ZoneRepository zoneRepository;
+    private final ZoneService zoneService; // 👈 AJOUTÉ pour interroger la logique de surface
 
     public List<MachineDTO> findAllByUsine(Long usineId) {
         log.debug("Recherche de toutes les machines de l'usine ID: {}", usineId);
@@ -43,7 +44,7 @@ public class MachineService {
     public MachineDTO create(MachineDTO dto) {
         log.info("[VALIDATION] Tentative de création d'une machine : {}", dto.getNom());
 
-        // 🛡️ SÉCURITÉ STRICTE : Vérification de l'existence de l'usine et de la zone
+        // 🛡️ SÉCURITÉ STRICTE : Existence usine et zone
         if (dto.getUsineId() == null || !usineRepository.existsById(dto.getUsineId())) {
             throw new IllegalArgumentException("Impossible de créer la machine : l'usine avec l'ID " + dto.getUsineId() + " n'existe pas.");
         }
@@ -51,9 +52,23 @@ public class MachineService {
             throw new IllegalArgumentException("Impossible de créer la machine : la zone avec l'ID " + dto.getZoneId() + " n'existe pas.");
         }
 
+        // 📐 ALGORITHME D'OPTIMISATION D'ESPACE
+        float surfaceRequise = dto.getLongueur() * dto.getLargeur();
+        float surfaceDisponible = zoneService.calculerSurfaceDisponible(dto.getZoneId());
+
+        log.info("[ESPACE] Machine requiert {} m². Surface disponible dans la zone : {} m²", surfaceRequise, surfaceDisponible);
+
+        if (surfaceRequise > surfaceDisponible) {
+            log.error("[ÉCHEC ESPACE] Espace insuffisant dans la zone ID {} pour accueillir la machine '{}'", dto.getZoneId(), dto.getNom());
+            throw new IllegalStateException(String.format(
+                    "Espace au sol insuffisant ! La machine requiert %.2f m² mais il ne reste que %.2f m² dans cette zone.",
+                    surfaceRequise, surfaceDisponible
+            ));
+        }
+
         Machine machine = toEntity(dto);
         Machine savedMachine = machineRepository.save(machine);
-        log.info("[SUCCÈS] Machine ID {} créée.", savedMachine.getId());
+        log.info("[SUCCÈS] Machine ID {} créée et implantée dans la zone.", savedMachine.getId());
         return toDTO(savedMachine);
     }
 
@@ -64,7 +79,7 @@ public class MachineService {
 
         log.info("Mise à jour de la machine ID {}.", id);
 
-        // 🛡️ SÉCURITÉ STRICTE SUR LE PUT : Validation de la nouvelle usine s'il y a un changement
+        // Validation usine s'il y a un changement
         Long currentUsineId = (machine.getUsine() != null) ? machine.getUsine().getId() : null;
         if (dto.getUsineId() != null && !dto.getUsineId().equals(currentUsineId)) {
             if (!usineRepository.existsById(dto.getUsineId())) {
@@ -74,13 +89,21 @@ public class MachineService {
             machine.setUsine(nouvelleUsine);
         }
 
-        // 🛡️ SÉCURITÉ STRICTE SUR LE PUT : Validation de la nouvelle zone s'il y a un changement
+        // Validation zone s'il y a un changement
         Long currentZoneId = (machine.getZone() != null) ? machine.getZone().getId() : null;
         if (dto.getZoneId() != null && !dto.getZoneId().equals(currentZoneId)) {
             if (!zoneRepository.existsById(dto.getZoneId())) {
                 throw new IllegalArgumentException("Impossible de modifier la machine : la nouvelle zone avec l'ID " + dto.getZoneId() + " n'existe pas.");
             }
             Zone nouvelleZone = zoneRepository.findById(dto.getZoneId()).get();
+
+            // On vérifie aussi l'espace si la machine change de zone !
+            float surfaceRequise = dto.getLongueur() * dto.getLargeur();
+            float surfaceDisponible = zoneService.calculerSurfaceDisponible(dto.getZoneId());
+            if (surfaceRequise > surfaceDisponible) {
+                throw new IllegalStateException("Impossible de déplacer la machine : espace insuffisant dans la nouvelle zone.");
+            }
+
             machine.setZone(nouvelleZone);
         }
 
@@ -100,7 +123,6 @@ public class MachineService {
     }
 
     // --- MAPPERS PRIVÉS ---
-
     private MachineDTO toDTO(Machine m) {
         return MachineDTO.builder()
                 .id(m.getId())

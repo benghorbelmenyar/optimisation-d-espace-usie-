@@ -8,7 +8,11 @@ import java.util.List;
 
 @Entity
 @Table(name = "processus")
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class Processus {
 
     @Id
@@ -33,6 +37,11 @@ public class Processus {
     @Column(name = "taux_charge")
     private float tauxCharge;
 
+    // ⚙️ CORRECTION LOGIQUE : Relation Un-à-Un (Une zone dédiée accueille un seul processus majeur)
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "zone_id", unique = true) // unique = true empêche qu'une autre zone s'approprie le même processus
+    private Zone zone;
+
     // 🔗 Relation ManyToMany avec Programme (Côté maître pour la table de jointure)
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
@@ -43,7 +52,7 @@ public class Processus {
     @Builder.Default
     private List<Programme> programmes = new ArrayList<>();
 
-    // 🔗 Relation OneToMany avec Poste (Un processus pour plusieurs postes)
+    // 🔗 Relation OneToMany avec Poste (Un processus pour plusieurs postes / activités de la zone)
     @OneToMany(mappedBy = "processus", fetch = FetchType.LAZY)
     @Builder.Default
     private List<Poste> postes = new ArrayList<>();

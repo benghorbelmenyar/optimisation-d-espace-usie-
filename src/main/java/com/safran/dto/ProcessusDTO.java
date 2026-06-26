@@ -13,7 +13,8 @@ public class ProcessusDTO {
     private int quantite;
     private int nombreOperateurs;
     private float tauxCharge;
-
-    // Contient uniquement les IDs des programmes associés pour le mapping
     private List<Long> programmeIds;
+
+    // ⚙️ AJOUT : L'identifiant de la zone pour fermer la relation OneToOne
+    private Long zoneId;
 }

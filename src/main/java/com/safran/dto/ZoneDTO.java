@@ -10,4 +10,6 @@ public class ZoneDTO {
     private float longueur;
     private float largeur;
     private float surfaceDisponible;
+    // ⚙️ AJOUT : Affichage et saisie du Besoin/Op dans Swagger
+    private float surfaceRequiseParPoste;
 }

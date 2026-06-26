@@ -30,16 +30,17 @@ public class SimulationController {
             @RequestParam Long utilisateurId,
             @RequestParam int duree,
             @RequestParam UniteTemps uniteTemps,
-            @RequestParam Long processusId) { // <-- Ajoute ce paramètre ici !
+            @RequestParam Long processusId) {
 
         log.info("Requête REST pour simuler le processus {} de l'usine {}", processusId, usineId);
-        List<SimulationDTO> result = simulationService.lancerSimulationDynamiqueParProcessus(usineId, utilisateurId, duree, uniteTemps, processusId);
+
+        // Appel du service (on repasse à 5 arguments, la surface est lue depuis la zone)
+        List<SimulationDTO> result = simulationService.lancerSimulationDynamiqueParProcessus(
+                usineId, utilisateurId, duree, uniteTemps, processusId);
+
         return ResponseEntity.status(HttpStatus.CREATED).body(result);
     }
 
-    /**
-     * Récupère l'historique des simulations d'une usine.
-     */
     @GetMapping("/usine/{usineId}")
     @PreAuthorize("hasRole('ADMINISTRATEUR') or hasRole('RESPONSABLE_PRODUCTION') or hasRole('RESPONSABLE_METHODE')")
     public ResponseEntity<List<SimulationDTO>> getByUsine(@PathVariable Long usineId) {

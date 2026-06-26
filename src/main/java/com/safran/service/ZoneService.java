@@ -2,13 +2,14 @@ package com.safran.service;
 
 import com.safran.dto.ZoneDTO;
 import com.safran.entity.Zone;
-import com.safran.entity.Usine; // 👈 Ajout de l'import de l'entité Usine
+import com.safran.entity.Usine;
 import com.safran.repository.ZoneRepository;
 import com.safran.repository.MachineRepository;
-import com.safran.repository.UsineRepository; // 👈 1. On importe le repository de l'usine
+import com.safran.repository.UsineRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -20,8 +21,9 @@ public class ZoneService {
 
     private final ZoneRepository zoneRepository;
     private final MachineRepository machineRepository;
-    private final UsineRepository usineRepository; // 👈 2. On l'injecte ici via @RequiredArgsConstructor
+    private final UsineRepository usineRepository;
 
+    @Transactional(readOnly = true)
     public List<ZoneDTO> findAll() {
         log.debug("Appel de findAll() dans ZoneService");
         return zoneRepository.findAll()
@@ -30,13 +32,16 @@ public class ZoneService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<ZoneDTO> findAllByUsine(Long usineId) {
         log.debug("Appel de findAllByUsine() pour l'usine ID: {}", usineId);
-        // Optionnel : Vous pouvez aussi vérifier si l'usine existe ici
         return zoneRepository.findByUsineId(usineId)
-                .stream().map(this::toDTO).collect(Collectors.toList());
+                .stream()
+                .map(this::toDTO)
+                .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public ZoneDTO findById(Long id) {
         return zoneRepository.findById(id)
                 .map(this::toDTO)
@@ -46,22 +51,35 @@ public class ZoneService {
                 });
     }
 
+    @Transactional
     public ZoneDTO create(ZoneDTO dto) {
         log.info("Tentative de création d'une zone. Vérification de l'existence de l'usine ID: {}", dto.getUsineId());
 
-        // 🛡️ SÉCURITÉ : Vérification que l'usine ciblée existe bien
-        if (dto.getUsineId() == null || !usineRepository.existsById(dto.getUsineId())) {
-            log.error("Échec de la création : L'usine avec l'ID {} n'existe pas.", dto.getUsineId());
-            throw new RuntimeException("Impossible de créer la zone : l'usine spécifiée (ID: " + dto.getUsineId() + ") n'existe pas.");
+        // 🛡️ SÉCURITÉ : Vérification et récupération de l'usine pour éviter le usine_id NULL
+        if (dto.getUsineId() == null) {
+            throw new IllegalArgumentException("Le champ 'usineId' est obligatoire pour créer une zone.");
         }
 
+        Usine usine = usineRepository.findById(dto.getUsineId())
+                .orElseThrow(() -> {
+                    log.error("Échec de la création : L'usine avec l'ID {} n'existe pas.", dto.getUsineId());
+                    return new RuntimeException("Impossible de créer la zone : l'usine spécifiée n'existe pas.");
+                });
+
         log.info("Usine validée. Sauvegarde de la zone '{}' en base de données...", dto.getNom());
+
         Zone zone = toEntity(dto);
+        zone.setUsine(usine); // 👈 FIX : On attache fermement l'usine récupérée
+
+        // Calcul automatique de la surface totale au sol avant sauvegarde
+        zone.setSurfaceTotale(zone.getLongueur() * zone.getLargeur());
+
         Zone savedZone = zoneRepository.save(zone);
         log.info("Zone créée avec succès. ID généré: {}", savedZone.getId());
         return toDTO(savedZone);
     }
 
+    @Transactional
     public ZoneDTO update(Long id, ZoneDTO dto) {
         Zone zone = zoneRepository.findById(id)
                 .orElseThrow(() -> {
@@ -71,13 +89,11 @@ public class ZoneService {
 
         log.info("Mise à jour de la zone ID {}. Ancien nom: '{}', Nouveau nom: '{}'", id, zone.getNom(), dto.getNom());
 
-        // 🛡️ CORRECTION : Utilisation de zone.getUsine().getId() au lieu de zone.getUsineId()
         Long currentUsineId = (zone.getUsine() != null) ? zone.getUsine().getId() : null;
 
         if (dto.getUsineId() != null && !dto.getUsineId().equals(currentUsineId)) {
             log.warn("Changement d'usine demandé pour la zone ID {}. Vérification de la nouvelle usine ID: {}", id, dto.getUsineId());
 
-            // On récupère l'objet Usine complet depuis la base de données
             Usine nouvelleUsine = usineRepository.findById(dto.getUsineId())
                     .orElseThrow(() -> {
                         log.error("Échec de la mise à jour : La nouvelle usine ID {} n'existe pas.", dto.getUsineId());
@@ -85,18 +101,21 @@ public class ZoneService {
                     });
 
             log.info("Nouvelle usine validée. Passage de l'usine {} à l'usine {}", currentUsineId, dto.getUsineId());
-            zone.setUsine(nouvelleUsine); // 👈 CORRECTION : setUsine au lieu de setUsineId
+            zone.setUsine(nouvelleUsine);
         }
 
         zone.setNom(dto.getNom());
         zone.setLongueur(dto.getLongueur());
         zone.setLargeur(dto.getLargeur());
+        zone.setSurfaceRequiseParPoste(dto.getSurfaceRequiseParPoste());
+        zone.setSurfaceTotale(dto.getLongueur() * dto.getLargeur()); // Recalcul de la surface totale
 
         Zone updatedZone = zoneRepository.save(zone);
         log.info("Zone ID {} mise à jour et enregistrée avec succès.", id);
         return toDTO(updatedZone);
     }
 
+    @Transactional
     public void delete(Long id) {
         if (!zoneRepository.existsById(id)) {
             log.error("Impossible de supprimer : la zone ID {} n'existe pas", id);
@@ -106,6 +125,7 @@ public class ZoneService {
         log.info("Zone ID {} supprimée de la base de données", id);
     }
 
+    @Transactional(readOnly = true)
     public float calculerSurfaceDisponible(Long zoneId) {
         Zone zone = zoneRepository.findById(zoneId)
                 .orElseThrow(() -> {
@@ -123,28 +143,34 @@ public class ZoneService {
         return disponible;
     }
 
-    private ZoneDTO toDTO(Zone zone) {
+    public ZoneDTO toDTO(Zone zone) {
+        if (zone == null) return null;
+
+        // On utilise la méthode dynamique calculerSurfaceDisponible pour envoyer l'espace réellement libre au DTO
+        float disponible = calculerSurfaceDisponible(zone.getId());
+
         return ZoneDTO.builder()
                 .id(zone.getId())
-                // 👈 CORRECTION : Extraction sécurisée de l'ID depuis l'objet Usine
                 .usineId(zone.getUsine() != null ? zone.getUsine().getId() : null)
                 .nom(zone.getNom())
-                .longueur(zone.getLongueur())
-                .largeur(zone.getLargeur())
-                .surfaceDisponible(calculerSurfaceDisponible(zone.getId()))
+                .longueur(zone.getLongueur()) // 👈 FIX : Ajout du mapping manquant
+                .largeur(zone.getLargeur())   // 👈 FIX : Ajout du mapping manquant
+                .surfaceDisponible(disponible)
+                .surfaceRequiseParPoste(zone.getSurfaceRequiseParPoste())
                 .build();
     }
 
-    private Zone toEntity(ZoneDTO dto) {
-        // 👈 CORRECTION : On récupère l'instance ou la référence de l'Usine requise pour le builder
-        Usine usine = usineRepository.findById(dto.getUsineId())
-                .orElseThrow(() -> new RuntimeException("Usine non trouvée avec id : " + dto.getUsineId()));
+    public Zone toEntity(ZoneDTO dto) {
+        if (dto == null) return null;
 
-        return Zone.builder()
-                .usine(usine) // 👈 CORRECTION : Association de l'objet complet
-                .nom(dto.getNom())
-                .longueur(dto.getLongueur())
-                .largeur(dto.getLargeur())
-                .build();
+        Zone zone = new Zone();
+        zone.setId(dto.getId());
+        zone.setNom(dto.getNom());
+        zone.setLongueur(dto.getLongueur()); // 👈 FIX : Ajout du mapping manquant
+        zone.setLargeur(dto.getLargeur());   // 👈 FIX : Ajout du mapping manquant
+        zone.setSurfaceRequiseParPoste(dto.getSurfaceRequiseParPoste());
+
+        // Note: L'usine est gérée directement dans les méthodes create et update pour plus de sécurité
+        return zone;
     }
 }
