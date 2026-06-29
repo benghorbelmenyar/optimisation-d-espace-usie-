@@ -10,14 +10,14 @@ public class Machine {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // 🔗 Vraie relation avec la table Usine (Clé Étrangère)
+    // 🏭 La machine appartient toujours obligatoirement à une Usine
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "usine_id", nullable = false)
     private Usine usine;
 
-    // 🔗 Vraie relation avec la table Zone (Clé Étrangère)
+    // 🗺️ Le lien devient optionnel (nullable = true) pour permettre la flexibilité
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "zone_id", nullable = false)
+    @JoinColumn(name = "zone_id", nullable = true)
     private Zone zone;
 
     @Column(nullable = false)

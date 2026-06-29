@@ -1,7 +1,11 @@
 package com.safran.controller;
 
+import com.safran.algorithm.LayoutPlacementOptimizer;
+import com.safran.algorithm.LayoutResult;
 import com.safran.dto.SimulationDTO;
+import com.safran.entity.Zone;
 import com.safran.enums.UniteTemps;
+import com.safran.repository.ZoneRepository;
 import com.safran.service.SimulationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -58,5 +62,20 @@ public class SimulationController {
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         simulationService.delete(id);
         return ResponseEntity.noContent().build();
+    }
+    private final ZoneRepository zoneRepository;
+    private final LayoutPlacementOptimizer layoutOptimizer; // 👈 Injection du nouvel outil
+    @PostMapping("/calculer-layout")
+    public ResponseEntity<LayoutResult> calculerLayout(
+            @RequestParam Long zoneId,
+            @RequestParam int nbPostesAAjouter,
+            @RequestParam float largeurPoste,
+            @RequestParam float longueurPoste) {
+
+        Zone zone = zoneRepository.findById(zoneId)
+                .orElseThrow(() -> new IllegalArgumentException("Zone introuvable"));
+
+        LayoutResult result = layoutOptimizer.calculerLayout(zone, nbPostesAAjouter, largeurPoste, longueurPoste);
+        return ResponseEntity.ok(result);
     }
 }

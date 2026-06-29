@@ -1,6 +1,7 @@
 package com.safran.dto;
 
 import lombok.*;
+import java.util.List;
 
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class ZoneDTO {
@@ -10,6 +11,8 @@ public class ZoneDTO {
     private float longueur;
     private float largeur;
     private float surfaceDisponible;
-    // ⚙️ AJOUT : Affichage et saisie du Besoin/Op dans Swagger
     private float surfaceRequiseParPoste;
+
+    // 💡 Intégration de ton MachineDTO existant
+    private List<MachineDTO> machines;
 }

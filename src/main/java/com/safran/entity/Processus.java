@@ -52,8 +52,5 @@ public class Processus {
     @Builder.Default
     private List<Programme> programmes = new ArrayList<>();
 
-    // 🔗 Relation OneToMany avec Poste (Un processus pour plusieurs postes / activités de la zone)
-    @OneToMany(mappedBy = "processus", fetch = FetchType.LAZY)
-    @Builder.Default
-    private List<Poste> postes = new ArrayList<>();
+
 }

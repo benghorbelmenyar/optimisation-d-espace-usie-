@@ -1,5 +1,7 @@
 package com.safran.service;
 
+import com.safran.algorithm.OptimizationResult;
+import com.safran.algorithm.SpaceOptimizationStrategy;
 import com.safran.dto.SimulationDTO;
 import com.safran.entity.*;
 import com.safran.enums.UniteTemps;
@@ -7,14 +9,14 @@ import com.safran.enums.StatutCommande;
 import com.safran.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -27,7 +29,10 @@ public class SimulationService {
     private final UtilisateurRepository utilisateurRepository;
     private final UsineRepository usineRepository;
     private final ProcessusRepository processusRepository;
-    private final ZoneService zoneService;
+
+    // ⚙️ INTEGRATION PACK-ALGORITHM : Injection du moteur d'optimisation dédié
+    @Qualifier("greedyOptimizer")
+    private final SpaceOptimizationStrategy spaceOptimizer;
 
     @Transactional(readOnly = true)
     public List<SimulationDTO> findAllByUsine(Long usineId) {
@@ -115,36 +120,48 @@ public class SimulationService {
 
         if (totalHeuresDemandees > hDispoTotale) {
             postesAAjouter = postesRequis - postesActuels;
-
             Zone zonePhysique = processus.getZone();
 
-            if (zonePhysique != null) {
-                // ⚙️ RÉCUPÉRATION DEPUIS LA TABLE ZONE
-                float surfaceParPoste = zonePhysique.getSurfaceRequiseParPoste();
+            // ❌ On est en sous-effectif/saturation de charge, donc la faisabilité actuelle est d'office FALSE
+            faisable = false;
 
+            if (zonePhysique != null) {
+                // ⚙️ Appel à l'algorithme d'optimisation
+                OptimizationResult result = spaceOptimizer.optimiser(zonePhysique, processus);
+
+                float surfaceParPoste = zonePhysique.getSurfaceRequiseParPoste();
                 if (surfaceParPoste <= 0) {
                     throw new IllegalStateException("La métrique 'surface_requise_par_poste' n'est pas configurée pour la zone '" + zonePhysique.getNom() + "'.");
                 }
 
                 float surfaceTotaleRequisePourAjout = postesAAjouter * surfaceParPoste;
-                float surfaceDisponibleDansZone = zoneService.calculerSurfaceDisponible(zonePhysique.getId());
+                float surfaceTotaleZone = zonePhysique.getLongueur() * zonePhysique.getLargeur();
+
+                float surfaceMachines = 0f;
+                if (zonePhysique.getMachines() != null) {
+                    for (Machine machine : zonePhysique.getMachines()) {
+                        surfaceMachines += (machine.getLongueur() * machine.getLargeur());
+                    }
+                }
+                float surfaceDisponibleDansZone = surfaceTotaleZone - surfaceMachines;
 
                 if (surfaceTotaleRequisePourAjout > surfaceDisponibleDansZone) {
-                    faisable = false;
-                    solution = String.format("SATURATION PHYSIQUE [%s] : Programmes: %s. Il faut AJOUTER %d poste(s) requérant %.1f m² (Config Zone: %.1f m²/poste), mais la zone '%s' ne dispose que de %.1f m² de libre. Déploiement impossible !",
-                            processus.getNom(), programmesConcernes, postesAAjouter, surfaceTotaleRequisePourAjout, surfaceParPoste, zonePhysique.getNom(), surfaceDisponibleDansZone);
+                    // Scenario B: Manque de place au sol manifeste
+                    solution = String.format("SATURATION PHYSIQUE [%s] : Programmes: %s. Il faut AJOUTER %d poste(s) requérant %.1f m² (Config Zone: %.1f m²/poste), mais la zone '%s' ne dispose pas d'assez d'espace. Déploiement impossible ! %s",
+                            processus.getNom(), programmesConcernes, postesAAjouter, surfaceTotaleRequisePourAjout, surfaceParPoste, zonePhysique.getNom(), result.getMessage());
                 } else {
-                    faisable = false;
-                    solution = String.format("SATURATION CAPACITAIRE [%s] : Programmes: %s. Il faut AJOUTER %d poste(s) (Empreinte requise: %.1f m²). Espace disponible suffisant dans la zone '%s' (%.1f m² libre(s)). Extension possible.",
-                            processus.getNom(), programmesConcernes, postesAAjouter, surfaceTotaleRequisePourAjout, zonePhysique.getNom(), surfaceDisponibleDansZone);
+                    // Scenario A: Manque de bras, mais l'espace au sol valide une extension future
+                    solution = String.format("SATURATION CAPACITAIRE [%s] : Programmes: %s. Il faut AJOUTER %d poste(s) (Empreinte requise: %.1f m²). Espace disponible suffisant dans la zone '%s'. Extension possible.",
+                            processus.getNom(), programmesConcernes, postesAAjouter, surfaceTotaleRequisePourAjout, zonePhysique.getNom());
                 }
             } else {
-                faisable = false;
                 solution = String.format("SATURATION [%s] : Programmes: %s. Il faut AJOUTER %d poste(s). Aucune zone physique n'est affectée à ce processus.",
                         processus.getNom(), programmesConcernes, postesAAjouter);
             }
 
         } else {
+            // ✔️ Si la capacité interne couvre la demande, la production est viable
+            faisable = true;
             postesARetirer = postesActuels - postesRequis;
             if (postesARetirer > 0) {
                 solution = String.format("OPTIMISATION [%s] : Programmes: %s. Charge cumulée de %.1f h. Surplus constaté. Possibilité de RETIRER %d poste(s).",
@@ -174,7 +191,7 @@ public class SimulationService {
 
         Simulation saved = simulationRepository.save(simulation);
 
-        return java.util.Arrays.asList(toDTO(saved));
+        return Collections.singletonList(toDTO(saved));
     }
 
     @Transactional

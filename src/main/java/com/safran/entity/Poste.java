@@ -32,7 +32,9 @@ public class Poste {
     @Enumerated(EnumType.STRING)
     @Column(name = "statut_couleur")
     private StatutCouleur statutCouleur;
+
+    // 🔄 NOUVELLE RELATION : Un poste est lié à un Programme
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "processus_id")
-    private Processus processus;
+    @JoinColumn(name = "programme_id", nullable = false) // Mettre nullable = false si un poste doit obligatoirement appartenir à un programme
+    private Programme programme;
 }

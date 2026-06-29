@@ -1,8 +1,10 @@
 package com.safran.service;
 
 import com.safran.dto.ZoneDTO;
+import com.safran.dto.MachineDTO;
 import com.safran.entity.Zone;
 import com.safran.entity.Usine;
+import com.safran.entity.Machine;
 import com.safran.repository.ZoneRepository;
 import com.safran.repository.MachineRepository;
 import com.safran.repository.UsineRepository;
@@ -11,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -53,110 +56,121 @@ public class ZoneService {
 
     @Transactional
     public ZoneDTO create(ZoneDTO dto) {
-        log.info("Tentative de création d'une zone. Vérification de l'existence de l'usine ID: {}", dto.getUsineId());
+        log.info("Tentative de création d'une zone pour l'usine ID: {}", dto.getUsineId());
 
-        // 🛡️ SÉCURITÉ : Vérification et récupération de l'usine pour éviter le usine_id NULL
         if (dto.getUsineId() == null) {
             throw new IllegalArgumentException("Le champ 'usineId' est obligatoire pour créer une zone.");
         }
 
         Usine usine = usineRepository.findById(dto.getUsineId())
-                .orElseThrow(() -> {
-                    log.error("Échec de la création : L'usine avec l'ID {} n'existe pas.", dto.getUsineId());
-                    return new RuntimeException("Impossible de créer la zone : l'usine spécifiée n'existe pas.");
-                });
-
-        log.info("Usine validée. Sauvegarde de la zone '{}' en base de données...", dto.getNom());
+                .orElseThrow(() -> new RuntimeException("Impossible de créer la zone : l'usine spécifiée n'existe pas."));
 
         Zone zone = toEntity(dto);
-        zone.setUsine(usine); // 👈 FIX : On attache fermement l'usine récupérée
-
-        // Calcul automatique de la surface totale au sol avant sauvegarde
+        zone.setUsine(usine);
         zone.setSurfaceTotale(zone.getLongueur() * zone.getLargeur());
 
+        if (zone.getMachines() != null) {
+            for (Machine machine : zone.getMachines()) {
+                machine.setZone(zone);
+                machine.setUsine(usine); // Une machine hérite de l'usine liée à sa zone
+            }
+        }
+
         Zone savedZone = zoneRepository.save(zone);
-        log.info("Zone créée avec succès. ID généré: {}", savedZone.getId());
+        log.info("Zone et machines créées avec succès. ID généré: {}", savedZone.getId());
         return toDTO(savedZone);
     }
 
     @Transactional
     public ZoneDTO update(Long id, ZoneDTO dto) {
         Zone zone = zoneRepository.findById(id)
-                .orElseThrow(() -> {
-                    log.error("Échec de la modification : Zone ID {} introuvable", id);
-                    return new RuntimeException("Zone non trouvée avec id : " + id);
-                });
-
-        log.info("Mise à jour de la zone ID {}. Ancien nom: '{}', Nouveau nom: '{}'", id, zone.getNom(), dto.getNom());
+                .orElseThrow(() -> new RuntimeException("Zone non trouvée avec id : " + id));
 
         Long currentUsineId = (zone.getUsine() != null) ? zone.getUsine().getId() : null;
+        Usine usineConcernee = zone.getUsine();
 
         if (dto.getUsineId() != null && !dto.getUsineId().equals(currentUsineId)) {
-            log.warn("Changement d'usine demandé pour la zone ID {}. Vérification de la nouvelle usine ID: {}", id, dto.getUsineId());
-
-            Usine nouvelleUsine = usineRepository.findById(dto.getUsineId())
-                    .orElseThrow(() -> {
-                        log.error("Échec de la mise à jour : La nouvelle usine ID {} n'existe pas.", dto.getUsineId());
-                        return new RuntimeException("La nouvelle usine spécifiée n'existe pas.");
-                    });
-
-            log.info("Nouvelle usine validée. Passage de l'usine {} à l'usine {}", currentUsineId, dto.getUsineId());
-            zone.setUsine(nouvelleUsine);
+            usineConcernee = usineRepository.findById(dto.getUsineId())
+                    .orElseThrow(() -> new RuntimeException("La nouvelle usine spécifiée n'existe pas."));
+            zone.setUsine(usineConcernee);
         }
 
         zone.setNom(dto.getNom());
         zone.setLongueur(dto.getLongueur());
         zone.setLargeur(dto.getLargeur());
         zone.setSurfaceRequiseParPoste(dto.getSurfaceRequiseParPoste());
-        zone.setSurfaceTotale(dto.getLongueur() * dto.getLargeur()); // Recalcul de la surface totale
+        zone.setSurfaceTotale(dto.getLongueur() * dto.getLargeur());
+
+        // 💡 FIX : Remplacement complet des méthodes toEntity de DTO obsolètes
+        if (dto.getMachines() != null) {
+            zone.getMachines().clear();
+            final Usine finalUsine = usineConcernee;
+            List<Machine> nouvellesMachines = dto.getMachines().stream()
+                    .map(mDTO -> Machine.builder()
+                            .id(mDTO.getId())
+                            .nom(mDTO.getNom())
+                            .longueur(mDTO.getLongueur())
+                            .largeur(mDTO.getLargeur())
+                            .zone(zone)
+                            .usine(finalUsine)
+                            .build()
+                    ).collect(Collectors.toList());
+            zone.getMachines().addAll(nouvellesMachines);
+        }
 
         Zone updatedZone = zoneRepository.save(zone);
-        log.info("Zone ID {} mise à jour et enregistrée avec succès.", id);
         return toDTO(updatedZone);
     }
 
     @Transactional
     public void delete(Long id) {
         if (!zoneRepository.existsById(id)) {
-            log.error("Impossible de supprimer : la zone ID {} n'existe pas", id);
             throw new RuntimeException("Zone introuvable");
         }
         zoneRepository.deleteById(id);
-        log.info("Zone ID {} supprimée de la base de données", id);
     }
 
     @Transactional(readOnly = true)
     public float calculerSurfaceDisponible(Long zoneId) {
         Zone zone = zoneRepository.findById(zoneId)
-                .orElseThrow(() -> {
-                    log.error("Calcul surface impossible : Zone ID {} introuvable", zoneId);
-                    return new RuntimeException("Zone non trouvée");
-                });
+                .orElseThrow(() -> new RuntimeException("Zone non trouvée"));
 
         float surfaceTotale = zone.getLongueur() * zone.getLargeur();
         float surfaceOccupee = machineRepository.findByZoneId(zoneId).stream()
                 .map(m -> m.getLongueur() * m.getLargeur())
                 .reduce(0f, Float::sum);
 
-        float disponible = surfaceTotale - surfaceOccupee;
-        log.debug("Zone ID {}: Surface Totale = {}m², Occupée = {}m², Disponible = {}m²", zoneId, surfaceTotale, surfaceOccupee, disponible);
-        return disponible;
+        return surfaceTotale - surfaceOccupee;
     }
 
     public ZoneDTO toDTO(Zone zone) {
         if (zone == null) return null;
 
-        // On utilise la méthode dynamique calculerSurfaceDisponible pour envoyer l'espace réellement libre au DTO
         float disponible = calculerSurfaceDisponible(zone.getId());
+
+        List<MachineDTO> machineDTOs = new ArrayList<>();
+        if (zone.getMachines() != null) {
+            machineDTOs = zone.getMachines().stream()
+                    .map(m -> MachineDTO.builder()
+                            .id(m.getId())
+                            .nom(m.getNom())
+                            .longueur(m.getLongueur())
+                            .largeur(m.getLargeur())
+                            .zoneId(zone.getId())
+                            .usineId(zone.getUsine() != null ? zone.getUsine().getId() : null)
+                            .build())
+                    .collect(Collectors.toList());
+        }
 
         return ZoneDTO.builder()
                 .id(zone.getId())
                 .usineId(zone.getUsine() != null ? zone.getUsine().getId() : null)
                 .nom(zone.getNom())
-                .longueur(zone.getLongueur()) // 👈 FIX : Ajout du mapping manquant
-                .largeur(zone.getLargeur())   // 👈 FIX : Ajout du mapping manquant
+                .longueur(zone.getLongueur())
+                .largeur(zone.getLargeur())
                 .surfaceDisponible(disponible)
                 .surfaceRequiseParPoste(zone.getSurfaceRequiseParPoste())
+                .machines(machineDTOs)
                 .build();
     }
 
@@ -166,11 +180,25 @@ public class ZoneService {
         Zone zone = new Zone();
         zone.setId(dto.getId());
         zone.setNom(dto.getNom());
-        zone.setLongueur(dto.getLongueur()); // 👈 FIX : Ajout du mapping manquant
-        zone.setLargeur(dto.getLargeur());   // 👈 FIX : Ajout du mapping manquant
+        zone.setLongueur(dto.getLongueur());
+        zone.setLargeur(dto.getLargeur());
         zone.setSurfaceRequiseParPoste(dto.getSurfaceRequiseParPoste());
 
-        // Note: L'usine est gérée directement dans les méthodes create et update pour plus de sécurité
+        if (dto.getMachines() != null) {
+            List<Machine> entitesMachines = dto.getMachines().stream()
+                    .map(mDTO -> Machine.builder()
+                            .id(mDTO.getId())
+                            .nom(mDTO.getNom())
+                            .longueur(mDTO.getLongueur())
+                            .largeur(mDTO.getLargeur())
+                            .zone(zone)
+                            .build()
+                    ).collect(Collectors.toList());
+            zone.setMachines(entitesMachines);
+        } else {
+            zone.setMachines(new ArrayList<>());
+        }
+
         return zone;
     }
 }

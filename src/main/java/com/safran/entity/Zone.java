@@ -17,7 +17,6 @@ public class Zone {
     @Column(nullable = false)
     private String nom;
 
-    // 💡 Remplacement de float par Float pour tolérer le NULL
     @Column(nullable = false)
     private Float longueur;
 
@@ -25,7 +24,7 @@ public class Zone {
     private Float largeur;
 
     @Column(name = "surface_totale")
-    private Float surfaceTotale; // 👈 Accepte désormais les NULL sans crasher
+    private Float surfaceTotale;
 
     @Column(name = "surface_requise_par_poste")
     private Float surfaceRequiseParPoste;
@@ -37,7 +36,8 @@ public class Zone {
     @OneToOne(mappedBy = "zone", fetch = FetchType.LAZY)
     private Processus processus;
 
-    @OneToMany(mappedBy = "zone", fetch = FetchType.LAZY)
+    // 💡 CORRECTION : Ajout de CascadeType.ALL et orphanRemoval pour sauvegarder automatiquement les machines imbriquées
+    @OneToMany(mappedBy = "zone", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<Machine> machines = new ArrayList<>();
 }

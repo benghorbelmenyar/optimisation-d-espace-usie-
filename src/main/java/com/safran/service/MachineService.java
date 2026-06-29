@@ -23,7 +23,7 @@ public class MachineService {
     private final MachineRepository machineRepository;
     private final UsineRepository usineRepository;
     private final ZoneRepository zoneRepository;
-    private final ZoneService zoneService; // 👈 AJOUTÉ pour interroger la logique de surface
+    private final ZoneService zoneService;
 
     public List<MachineDTO> findAllByUsine(Long usineId) {
         log.debug("Recherche de toutes les machines de l'usine ID: {}", usineId);
@@ -44,31 +44,34 @@ public class MachineService {
     public MachineDTO create(MachineDTO dto) {
         log.info("[VALIDATION] Tentative de création d'une machine : {}", dto.getNom());
 
-        // 🛡️ SÉCURITÉ STRICTE : Existence usine et zone
+        // 🛡️ SÉCURITÉ : L'usine reste obligatoire
         if (dto.getUsineId() == null || !usineRepository.existsById(dto.getUsineId())) {
             throw new IllegalArgumentException("Impossible de créer la machine : l'usine avec l'ID " + dto.getUsineId() + " n'existe pas.");
         }
-        if (dto.getZoneId() == null || !zoneRepository.existsById(dto.getZoneId())) {
-            throw new IllegalArgumentException("Impossible de créer la machine : la zone avec l'ID " + dto.getZoneId() + " n'existe pas.");
-        }
 
-        // 📐 ALGORITHME D'OPTIMISATION D'ESPACE
-        float surfaceRequise = dto.getLongueur() * dto.getLargeur();
-        float surfaceDisponible = zoneService.calculerSurfaceDisponible(dto.getZoneId());
+        // 📐 ALGORITHME D'OPTIMISATION D'ESPACE (Seulement si une zone est fournie)
+        if (dto.getZoneId() != null) {
+            if (!zoneRepository.existsById(dto.getZoneId())) {
+                throw new IllegalArgumentException("Impossible de créer la machine : la zone avec l'ID " + dto.getZoneId() + " n'existe pas.");
+            }
 
-        log.info("[ESPACE] Machine requiert {} m². Surface disponible dans la zone : {} m²", surfaceRequise, surfaceDisponible);
+            float surfaceRequise = dto.getLongueur() * dto.getLargeur();
+            float surfaceDisponible = zoneService.calculerSurfaceDisponible(dto.getZoneId());
 
-        if (surfaceRequise > surfaceDisponible) {
-            log.error("[ÉCHEC ESPACE] Espace insuffisant dans la zone ID {} pour accueillir la machine '{}'", dto.getZoneId(), dto.getNom());
-            throw new IllegalStateException(String.format(
-                    "Espace au sol insuffisant ! La machine requiert %.2f m² mais il ne reste que %.2f m² dans cette zone.",
-                    surfaceRequise, surfaceDisponible
-            ));
+            log.info("[ESPACE] Machine requiert {} m². Surface disponible dans la zone : {} m²", surfaceRequise, surfaceDisponible);
+
+            if (surfaceRequise > surfaceDisponible) {
+                log.error("[ÉCHEC ESPACE] Espace insuffisant dans la zone ID {} pour accueillir la machine '{}'", dto.getZoneId(), dto.getNom());
+                throw new IllegalStateException(String.format(
+                        "Espace au sol insuffisant ! La machine requiert %.2f m² mais il ne reste que %.2f m² dans cette zone.",
+                        surfaceRequise, surfaceDisponible
+                ));
+            }
         }
 
         Machine machine = toEntity(dto);
         Machine savedMachine = machineRepository.save(machine);
-        log.info("[SUCCÈS] Machine ID {} créée et implantée dans la zone.", savedMachine.getId());
+        log.info("[SUCCÈS] Machine ID {} créée.", savedMachine.getId());
         return toDTO(savedMachine);
     }
 
@@ -85,7 +88,9 @@ public class MachineService {
             if (!usineRepository.existsById(dto.getUsineId())) {
                 throw new IllegalArgumentException("Impossible de modifier la machine : la nouvelle usine avec l'ID " + dto.getUsineId() + " n'existe pas.");
             }
-            Usine nouvelleUsine = usineRepository.findById(dto.getUsineId()).get();
+            Usine nouvelleUsine = usineRepository.findById(dto.getUsineId()).orElseThrow(
+                    () -> new IllegalArgumentException("Usine introuvable")
+            );
             machine.setUsine(nouvelleUsine);
         }
 
@@ -95,7 +100,9 @@ public class MachineService {
             if (!zoneRepository.existsById(dto.getZoneId())) {
                 throw new IllegalArgumentException("Impossible de modifier la machine : la nouvelle zone avec l'ID " + dto.getZoneId() + " n'existe pas.");
             }
-            Zone nouvelleZone = zoneRepository.findById(dto.getZoneId()).get();
+            Zone nouvelleZone = zoneRepository.findById(dto.getZoneId()).orElseThrow(
+                    () -> new IllegalArgumentException("Zone introuvable")
+            );
 
             // On vérifie aussi l'espace si la machine change de zone !
             float surfaceRequise = dto.getLongueur() * dto.getLargeur();
@@ -105,6 +112,9 @@ public class MachineService {
             }
 
             machine.setZone(nouvelleZone);
+        } else if (dto.getZoneId() == null) {
+            // Permet de désassigner explicitement une machine d'une zone
+            machine.setZone(null);
         }
 
         machine.setNom(dto.getNom());
@@ -137,12 +147,17 @@ public class MachineService {
     private Machine toEntity(MachineDTO dto) {
         Usine usine = usineRepository.findById(dto.getUsineId())
                 .orElseThrow(() -> new RuntimeException("Usine non trouvée avec l'id : " + dto.getUsineId()));
-        Zone zone = zoneRepository.findById(dto.getZoneId())
-                .orElseThrow(() -> new RuntimeException("Zone non trouvée avec l'id : " + dto.getZoneId()));
+
+        // 💡 FIX IMPORTANTE : On récupère et associe la zone si elle est présente dans le DTO
+        Zone zone = null;
+        if (dto.getZoneId() != null) {
+            zone = zoneRepository.findById(dto.getZoneId())
+                    .orElseThrow(() -> new RuntimeException("Zone non trouvée avec l'id : " + dto.getZoneId()));
+        }
 
         return Machine.builder()
                 .usine(usine)
-                .zone(zone)
+                .zone(zone) // Ne fera plus d'erreur si zone est nulle !
                 .nom(dto.getNom())
                 .longueur(dto.getLongueur())
                 .largeur(dto.getLargeur())
