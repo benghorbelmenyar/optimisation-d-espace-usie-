@@ -3,11 +3,11 @@ package com.safran.service;
 import com.safran.dto.PosteDTO;
 import com.safran.entity.Poste;
 import com.safran.entity.Usine;
-import com.safran.entity.Programme; // 💡 AJOUTÉ
+import com.safran.entity.Programme;
 import com.safran.enums.StatutCouleur;
 import com.safran.repository.PosteRepository;
 import com.safran.repository.UsineRepository;
-import com.safran.repository.ProgrammeRepository; // 💡 AJOUTÉ
+import com.safran.repository.ProgrammeRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -23,7 +23,7 @@ public class PosteService {
 
     private final PosteRepository posteRepository;
     private final UsineRepository usineRepository;
-    private final ProgrammeRepository programmeRepository; // 💡 AJOUTÉ pour lier le Programme
+    private final ProgrammeRepository programmeRepository;
 
     @Transactional(readOnly = true)
     public List<PosteDTO> findAll() {
@@ -53,13 +53,11 @@ public class PosteService {
     public PosteDTO create(PosteDTO dto) {
         log.info("Tentative de création de poste. Validation de l'usine ID: {} et Programme ID: {}", dto.getUsineId(), dto.getProgrammeId());
 
-        // 🛡️ SÉCURITÉ : Bloque si l'usine n'existe pas
         if (dto.getUsineId() == null || !usineRepository.existsById(dto.getUsineId())) {
             log.error("Échec création poste : L'usine ID {} est introuvable !", dto.getUsineId());
             throw new IllegalArgumentException("Impossible de créer le poste : l'usine spécifiée n'existe pas.");
         }
 
-        // 🛡️ SÉCURITÉ : Bloque si le programme n'existe pas
         if (dto.getProgrammeId() == null || !programmeRepository.existsById(dto.getProgrammeId())) {
             log.error("Échec création poste : Le programme ID {} est introuvable !", dto.getProgrammeId());
             throw new IllegalArgumentException("Impossible de créer le poste : le programme spécifié n'existe pas.");
@@ -85,7 +83,6 @@ public class PosteService {
 
         log.info("Mise à jour du poste ID {}. Ancien nom: '{}', Nouveau: '{}'", id, poste.getNom(), dto.getNom());
 
-        // 🛡️ CHANGEMENT ET VALIDATION DE L'USINE
         Long currentUsineId = (poste.getUsine() != null) ? poste.getUsine().getId() : null;
         if (dto.getUsineId() != null && !dto.getUsineId().equals(currentUsineId)) {
             Usine nouvelleUsine = usineRepository.findById(dto.getUsineId())
@@ -93,7 +90,6 @@ public class PosteService {
             poste.setUsine(nouvelleUsine);
         }
 
-        // 🛡️ CHANGEMENT ET VALIDATION DU PROGRAMME
         Long currentProgrammeId = (poste.getProgramme() != null) ? poste.getProgramme().getId() : null;
         if (dto.getProgrammeId() != null && !dto.getProgrammeId().equals(currentProgrammeId)) {
             Programme nouveauProgramme = programmeRepository.findById(dto.getProgrammeId())
@@ -107,6 +103,7 @@ public class PosteService {
         poste.setCycleTime(dto.getCycleTime());
         poste.setNombreOperateurs(dto.getNombreOperateurs());
         poste.setQuantite(dto.getQuantite());
+        poste.setNombreShifts(dto.getNombreShifts() <= 0 ? 1 : dto.getNombreShifts()); // 💡 AJOUTÉ
 
         if (dto.getStatutCouleur() != null) {
             poste.setStatutCouleur(dto.getStatutCouleur());
@@ -127,13 +124,11 @@ public class PosteService {
         log.info("Poste ID {} supprimé.", id);
     }
 
-    // --- MAPPERS PRIVÉS ---
-
     private PosteDTO toDTO(Poste p) {
         return PosteDTO.builder()
                 .id(p.getId())
                 .usineId(p.getUsine() != null ? p.getUsine().getId() : null)
-                .programmeId(p.getProgramme() != null ? p.getProgramme().getId() : null) // 💡 AJOUTÉ
+                .programmeId(p.getProgramme() != null ? p.getProgramme().getId() : null)
                 .nom(p.getNom())
                 .longueur(p.getLongueur())
                 .largeur(p.getLargeur())
@@ -141,6 +136,7 @@ public class PosteService {
                 .nombreOperateurs(p.getNombreOperateurs())
                 .quantite(p.getQuantite())
                 .statutCouleur(p.getStatutCouleur())
+                .nombreShifts(p.getNombreShifts()) // 💡 AJOUTÉ
                 .build();
     }
 
@@ -148,13 +144,12 @@ public class PosteService {
         Usine usine = usineRepository.findById(dto.getUsineId())
                 .orElseThrow(() -> new RuntimeException("Usine non trouvée avec l'id : " + dto.getUsineId()));
 
-        // 💡 FIX IMPORTANTE : On charge le programme depuis son repository pour l'associer au Builder
         Programme programme = programmeRepository.findById(dto.getProgrammeId())
                 .orElseThrow(() -> new RuntimeException("Programme non trouvé avec l'id : " + dto.getProgrammeId()));
 
         return Poste.builder()
                 .usine(usine)
-                .programme(programme) // 💡 AJOUTÉ
+                .programme(programme)
                 .nom(dto.getNom())
                 .longueur(dto.getLongueur())
                 .largeur(dto.getLargeur())
@@ -162,6 +157,7 @@ public class PosteService {
                 .nombreOperateurs(dto.getNombreOperateurs())
                 .quantite(dto.getQuantite())
                 .statutCouleur(dto.getStatutCouleur())
+                .nombreShifts(dto.getNombreShifts() <= 0 ? 1 : dto.getNombreShifts()) // 💡 AJOUTÉ
                 .build();
     }
 }

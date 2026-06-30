@@ -29,8 +29,8 @@ public class SimulationService {
     private final UtilisateurRepository utilisateurRepository;
     private final UsineRepository usineRepository;
     private final ProcessusRepository processusRepository;
+    private final PosteRepository posteRepository; // 💡 AJOUTÉ pour lier la logique de shifts
 
-    // ⚙️ INTEGRATION PACK-ALGORITHM : Injection du moteur d'optimisation dédié
     @Qualifier("greedyOptimizer")
     private final SpaceOptimizationStrategy spaceOptimizer;
 
@@ -49,7 +49,7 @@ public class SimulationService {
 
     @Transactional
     public List<SimulationDTO> lancerSimulationDynamiqueParProcessus(Long usineId, Long utilisateurId, int quantite, UniteTemps unite, Long processusId) {
-        log.info("[SIMULATION] Analyse Charge & Espace automatique pour Processus: {}", processusId);
+        log.info("[SIMULATION] Analyse RH, Shifts & Espace pour Processus: {}", processusId);
 
         Usine usine = usineRepository.findById(usineId)
                 .orElseThrow(() -> new IllegalArgumentException("L'usine spécifiée n'existe pas."));
@@ -107,72 +107,97 @@ public class SimulationService {
                 .mapToDouble(BesoinCommande::getHeuresDemandees)
                 .sum();
 
-        int postesActuels = processus.getNombreOperateurs();
-        float hDispoParPoste = 1840f * facteurTemps;
-        float hDispoTotale = postesActuels * hDispoParPoste;
+        // 💡 MAJ LOGIQUE INDUSTRIELLE SHIFTS
+        // On cherche le poste physique principal attaché à ce programme
+        List<Poste> postesDuProcessus = posteRepository.findByUsineId(usineId).stream()
+                .filter(p -> p.getProgramme() != null && processus.getProgrammes().contains(p.getProgramme()))
+                .collect(Collectors.toList());
 
-        int postesRequis = (int) Math.ceil(totalHeuresDemandees / hDispoParPoste);
+        int maxShiftsActuels = 1;
+        int nombreOperateursParPoste = processus.getNombreOperateurs(); // Valeur secours si pas de poste
+        int quantitePostesPhysiques = 1;
 
-        int postesAAjouter = 0;
-        int postesARetirer = 0;
+        if (!postesDuProcessus.isEmpty()) {
+            Poste postePrincipal = postesDuProcessus.get(0);
+            maxShiftsActuels = postePrincipal.getNombreShifts() <= 0 ? 1 : postePrincipal.getNombreShifts();
+            nombreOperateursParPoste = postePrincipal.getNombreOperateurs();
+            quantitePostesPhysiques = postePrincipal.getQuantite() <= 0 ? 1 : postePrincipal.getQuantite();
+        }
+
+        int totalOperateursActuelsTotaux = nombreOperateursParPoste * maxShiftsActuels * quantitePostesPhysiques;
+
+        // Formule de capacité ajustée au nombre de shifts de production
+        float hDispoParOperateur = 1840f * facteurTemps;
+        float hDispoTotaleMoyensActuels = totalOperateursActuelsTotaux * hDispoParOperateur;
+
+        int totalOperateursRequisTotaux = (int) Math.ceil(totalHeuresDemandees / hDispoParOperateur);
+
+        int operateursAAjouter = 0;
+        int operateursARetirer = 0;
         boolean faisable = true;
         String solution;
 
-        if (totalHeuresDemandees > hDispoTotale) {
-            postesAAjouter = postesRequis - postesActuels;
-            Zone zonePhysique = processus.getZone();
-
-            // ❌ On est en sous-effectif/saturation de charge, donc la faisabilité actuelle est d'office FALSE
+        if (totalHeuresDemandees > hDispoTotaleMoyensActuels) {
+            operateursAAjouter = totalOperateursRequisTotaux - totalOperateursActuelsTotaux;
             faisable = false;
 
-            if (zonePhysique != null) {
-                // ⚙️ Appel à l'algorithme d'optimisation
-                OptimizationResult result = spaceOptimizer.optimiser(zonePhysique, processus);
+            // Calcul du nombre de shifts nécessaires pour absorber le flux sans construire de poste
+            int shiftsRequis = (int) Math.ceil((double) totalOperateursRequisTotaux / (nombreOperateursParPoste * quantitePostesPhysiques));
 
-                float surfaceParPoste = zonePhysique.getSurfaceRequiseParPoste();
-                if (surfaceParPoste <= 0) {
-                    throw new IllegalStateException("La métrique 'surface_requise_par_poste' n'est pas configurée pour la zone '" + zonePhysique.getNom() + "'.");
-                }
-
-                float surfaceTotaleRequisePourAjout = postesAAjouter * surfaceParPoste;
-                float surfaceTotaleZone = zonePhysique.getLongueur() * zonePhysique.getLargeur();
-
-                float surfaceMachines = 0f;
-                if (zonePhysique.getMachines() != null) {
-                    for (Machine machine : zonePhysique.getMachines()) {
-                        surfaceMachines += (machine.getLongueur() * machine.getLargeur());
-                    }
-                }
-                float surfaceDisponibleDansZone = surfaceTotaleZone - surfaceMachines;
-
-                if (surfaceTotaleRequisePourAjout > surfaceDisponibleDansZone) {
-                    // Scenario B: Manque de place au sol manifeste
-                    solution = String.format("SATURATION PHYSIQUE [%s] : Programmes: %s. Il faut AJOUTER %d poste(s) requérant %.1f m² (Config Zone: %.1f m²/poste), mais la zone '%s' ne dispose pas d'assez d'espace. Déploiement impossible ! %s",
-                            processus.getNom(), programmesConcernes, postesAAjouter, surfaceTotaleRequisePourAjout, surfaceParPoste, zonePhysique.getNom(), result.getMessage());
-                } else {
-                    // Scenario A: Manque de bras, mais l'espace au sol valide une extension future
-                    solution = String.format("SATURATION CAPACITAIRE [%s] : Programmes: %s. Il faut AJOUTER %d poste(s) (Empreinte requise: %.1f m²). Espace disponible suffisant dans la zone '%s'. Extension possible.",
-                            processus.getNom(), programmesConcernes, postesAAjouter, surfaceTotaleRequisePourAjout, zonePhysique.getNom());
-                }
+            if (shiftsRequis <= 2 && maxShiftsActuels < 2) {
+                // 💡 CAS IDÉAL : Le passage en Double Shift résout le problème sans impact au sol
+                solution = String.format("REORGANISATION CAPACITAIRE [%s] : Programmes: %s. Charge de %.1f h. Le poste actuel est saturé en Single Shift. " +
+                                "SOLUTION : Passer en DOUBLE SHIFT (Shifts requis: 2). Recrutement requis : +%d opérateur(s) (Staff total requis: %d). Aucun nouvel emplacement physique au sol requis.",
+                        processus.getNom(), programmesConcernes, totalHeuresDemandees, operateursAAjouter, totalOperateursRequisTotaux);
             } else {
-                solution = String.format("SATURATION [%s] : Programmes: %s. Il faut AJOUTER %d poste(s). Aucune zone physique n'est affectée à ce processus.",
-                        processus.getNom(), programmesConcernes, postesAAjouter);
+                // Si même le double/triple shift ne suffit pas, on doit ajouter de la surface au sol (Nouveau poste)
+                Zone zonePhysique = processus.getZone();
+                int postesPhysiquesAAjouter = (int) Math.ceil((double) operateursAAjouter / (nombreOperateursParPoste * (maxShiftsActuels == 1 ? 2 : maxShiftsActuels)));
+
+                if (zonePhysique != null) {
+                    OptimizationResult result = spaceOptimizer.optimiser(zonePhysique, processus);
+                    float surfaceParPoste = zonePhysique.getSurfaceRequiseParPoste();
+                    if (surfaceParPoste <= 0) {
+                        throw new IllegalStateException("La métrique 'surface_requise_par_poste' n'est pas configurée pour la zone '" + zonePhysique.getNom() + "'.");
+                    }
+
+                    float surfaceTotaleRequisePourAjout = postesPhysiquesAAjouter * surfaceParPoste;
+                    float surfaceTotaleZone = zonePhysique.getLongueur() * zonePhysique.getLargeur();
+
+                    float surfaceMachines = 0f;
+                    if (zonePhysique.getMachines() != null) {
+                        for (Machine machine : zonePhysique.getMachines()) {
+                            surfaceMachines += (machine.getLongueur() * machine.getLargeur());
+                        }
+                    }
+                    float surfaceDisponibleDansZone = surfaceTotaleZone - surfaceMachines;
+
+                    if (surfaceTotaleRequisePourAjout > surfaceDisponibleDansZone) {
+                        solution = String.format("SATURATION PHYSIQUE SÉVÈRE [%s] : Programmes: %s. Les shifts actuels (%dx8h) sont au maximum. L'ajout de %d poste(s) physique(s) requiert %.1f m², mais la zone '%s' est pleine. Déploiement bloqué. %s",
+                                processus.getNom(), programmesConcernes, maxShiftsActuels, postesPhysiquesAAjouter, surfaceTotaleRequisePourAjout, zonePhysique.getNom(), result.getMessage());
+                    } else {
+                        solution = String.format("SATURATION AVEC EXTENSION SOL [%s] : Programmes: %s. Shifts saturés. Il faut ajouter %d poste(s) physique(s) (Empreinte: %.1f m²). Place disponible dans la zone '%s'. Embauche de +%d opérateurs requise.",
+                                processus.getNom(), programmesConcernes, postesPhysiquesAAjouter, surfaceTotaleRequisePourAjout, zonePhysique.getNom(), operateursAAjouter);
+                    }
+                } else {
+                    solution = String.format("SATURATION CAPACITAIRE [%s] : Programmes: %s. Équipes saturées. Recrutement de +%d opérateur(s) requis. Aucune zone physique associée pour valider l'espace.",
+                            processus.getNom(), programmesConcernes, operateursAAjouter);
+                }
             }
 
         } else {
-            // ✔️ Si la capacité interne couvre la demande, la production est viable
             faisable = true;
-            postesARetirer = postesActuels - postesRequis;
-            if (postesARetirer > 0) {
-                solution = String.format("OPTIMISATION [%s] : Programmes: %s. Charge cumulée de %.1f h. Surplus constaté. Possibilité de RETIRER %d poste(s).",
-                        processus.getNom(), programmesConcernes, totalHeuresDemandees, postesARetirer);
+            operateursARetirer = totalOperateursActuelsTotaux - totalOperateursRequisTotaux;
+            if (operateursARetirer > 0) {
+                solution = String.format("OPTIMISATION FLUX [%s] : Programmes: %s. Charge cumulée de %.1f h. Vos équipes en %dx8h disposent d'un surplus. Option de réduction de charge ou redéploiement de %d opérateur(s).",
+                        processus.getNom(), programmesConcernes, totalHeuresDemandees, operateursARetirer);
             } else {
-                solution = String.format("ÉQUILIBRE [%s] : Programmes: %s. Charge cumulée de %.1f h. Vos %d postes actuels sont idéalement dimensionnés.",
-                        processus.getNom(), programmesConcernes, totalHeuresDemandees, postesActuels);
+                solution = String.format("ÉQUILIBRE INDUSTRIEL [%s] : Programmes: %s. Charge cumulée de %.1f h. Vos équipes actuelles (%dx8h) sont parfaitement dimensionnées.",
+                        processus.getNom(), programmesConcernes, totalHeuresDemandees, maxShiftsActuels);
             }
         }
 
-        float tauxCharge = hDispoTotale > 0 ? (totalHeuresDemandees / hDispoTotale) * 100 : 100f;
+        float tauxCharge = hDispoTotaleMoyensActuels > 0 ? (totalHeuresDemandees / hDispoTotaleMoyensActuels) * 100 : 100f;
 
         Simulation simulation = Simulation.builder()
                 .usine(usine)
@@ -180,17 +205,16 @@ public class SimulationService {
                 .utilisateur(utilisateur)
                 .dateSimulation(LocalDateTime.now())
                 .heuresDemandees(totalHeuresDemandees)
-                .heuresDisponiblesActuelles(hDispoTotale)
-                .operateursActuels(postesActuels)
-                .operateursAAjouter(postesAAjouter)
-                .operateursARetirer(postesARetirer)
+                .heuresDisponiblesActuelles(hDispoTotaleMoyensActuels)
+                .operateursActuels(totalOperateursActuelsTotaux)
+                .operateursAAjouter(operateursAAjouter)
+                .operateursARetirer(operateursARetirer)
                 .tauxChargeProcessus(tauxCharge)
                 .faisabilite(faisable)
                 .solutionProposee(solution)
                 .build();
 
         Simulation saved = simulationRepository.save(simulation);
-
         return Collections.singletonList(toDTO(saved));
     }
 

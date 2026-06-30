@@ -15,5 +15,6 @@ public class PosteDTO {
     private int quantite;
     private StatutCouleur statutCouleur;
     private double capacite;
-    private Long programmeId; // 👈 À la place de processusId
+    private Long programmeId;
+    private int nombreShifts;
 }

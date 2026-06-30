@@ -37,4 +37,8 @@ public class Poste {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "programme_id", nullable = false) // Mettre nullable = false si un poste doit obligatoirement appartenir à un programme
     private Programme programme;
+    // Dans Poste.java
+    @Column(name = "nombre_shifts", nullable = false)
+    @Builder.Default
+    private int nombreShifts = 1; // 👈 1 = standard, 2 = double shift, 3 = triple shift
 }
