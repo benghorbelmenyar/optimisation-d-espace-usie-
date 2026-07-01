@@ -4,7 +4,7 @@ import com.safran.algorithm.LayoutPlacementOptimizer;
 import com.safran.algorithm.LayoutResult;
 import com.safran.dto.SimulationDTO;
 import com.safran.entity.Zone;
-import com.safran.enums.UniteTemps;
+import com.safran.entity.UniteTemps;
 import com.safran.repository.ZoneRepository;
 import com.safran.service.SimulationService;
 import lombok.RequiredArgsConstructor;

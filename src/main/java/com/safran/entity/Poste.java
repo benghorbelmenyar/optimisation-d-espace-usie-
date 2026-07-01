@@ -1,44 +1,38 @@
 package com.safran.entity;
 
-import com.safran.enums.StatutCouleur;
 import lombok.*;
 import javax.persistence.*;
 
 @Entity
-@Table(name = "poste")
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+@Table(name = "postes")
+@Data // 💡 Génère automatiquement les getters, setters, toString, etc.
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class Poste {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "usine_id", nullable = false)
-    private Usine usine;
-
-    @Column(nullable = false)
     private String nom;
-
-    private float longueur;
-    private float largeur;
-
-    @Column(name = "cycle_time")
-    private float cycleTime;
-
-    @Column(name = "nombre_operateurs")
-    private int nombreOperateurs;
-
-    private int quantite;
+    private Float longueur;
+    private Float largeur;
+    private Integer quantite;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "statut_couleur")
     private StatutCouleur statutCouleur;
 
-    // 🔄 NOUVELLE RELATION : Un poste est lié à un Programme
+    private Integer nombreShifts;
+
+    // 💡 AJOUTER CE CHAMP DANS L'ENTITÉ
+    private Integer nombreOperateurs;
+
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "programme_id", nullable = false) // Mettre nullable = false si un poste doit obligatoirement appartenir à un programme
+    @JoinColumn(name = "usine_id")
+    private Usine usine;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "programme_id")
     private Programme programme;
-    // Dans Poste.java
-    @Column(name = "nombre_shifts", nullable = false)
-    @Builder.Default
-    private int nombreShifts = 1; // 👈 1 = standard, 2 = double shift, 3 = triple shift
 }

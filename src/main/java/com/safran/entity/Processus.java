@@ -1,8 +1,8 @@
 package com.safran.entity;
 
-import com.safran.enums.typeP;
 import lombok.*;
 import javax.persistence.*;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -22,14 +22,12 @@ public class Processus {
     @Column(nullable = false)
     private String nom;
 
-    @Column(name = "temps_unitaire")
-    private float tempsUnitaire;
+    @Column(name = "charge_annuelle", nullable = false)
+    private float chargeAnnuelle; // 💡 Remplace tempsUnitaire (Stocke la charge globale en heures, ex: 108.0)
 
     @Enumerated(EnumType.STRING)
     @Column(name = "type_p", nullable = false)
     private typeP typeP;
-
-    private int quantite;
 
     @Column(name = "nombre_operateurs")
     private int nombreOperateurs;
@@ -37,7 +35,13 @@ public class Processus {
     @Column(name = "taux_charge")
     private float tauxCharge;
 
-    // ⚙️ CORRECTION LOGIQUE : Relation Un-à-Un (Une zone dédiée accueille un seul processus majeur)
+    @Column(name = "annee_charge", nullable = false)
+    private int anneeCharge; // 💡 Année cible de la planification capacitaire (ex: 2026)
+
+    @Column(name = "date_ajout_charge", nullable = false)
+    private LocalDateTime dateAjoutCharge; // 💡 Horodatage de l'enregistrement ou de la modification
+
+    // ⚙️ Relation Un-à-Un (Une zone dédiée accueille un seul processus majeur)
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "zone_id", unique = true) // unique = true empêche qu'une autre zone s'approprie le même processus
     private Zone zone;
@@ -51,6 +55,4 @@ public class Processus {
     )
     @Builder.Default
     private List<Programme> programmes = new ArrayList<>();
-
-
 }

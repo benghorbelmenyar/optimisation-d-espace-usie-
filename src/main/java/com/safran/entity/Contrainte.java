@@ -1,6 +1,5 @@
 package com.safran.entity;
 
-import com.safran.enums.TypeContrainte;
 import lombok.*;
 import javax.persistence.*;
 

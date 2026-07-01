@@ -1,6 +1,6 @@
 package com.safran.dto;
 
-import com.safran.enums.TypeContrainte;
+import com.safran.entity.TypeContrainte;
 import lombok.*;
 
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder

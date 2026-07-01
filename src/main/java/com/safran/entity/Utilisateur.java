@@ -1,6 +1,5 @@
 package com.safran.entity;
 
-import com.safran.enums.RoleUtilisateur;
 import lombok.*;
 import javax.persistence.*;
 import java.time.LocalDate;

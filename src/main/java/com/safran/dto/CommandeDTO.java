@@ -1,6 +1,6 @@
 package com.safran.dto;
 
-import com.safran.enums.StatutCommande;
+import com.safran.entity.StatutCommande;
 import lombok.*;
 import java.time.LocalDate;
 import java.util.List;

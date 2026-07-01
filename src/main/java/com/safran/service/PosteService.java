@@ -4,7 +4,7 @@ import com.safran.dto.PosteDTO;
 import com.safran.entity.Poste;
 import com.safran.entity.Usine;
 import com.safran.entity.Programme;
-import com.safran.enums.StatutCouleur;
+import com.safran.entity.StatutCouleur;
 import com.safran.repository.PosteRepository;
 import com.safran.repository.UsineRepository;
 import com.safran.repository.ProgrammeRepository;
@@ -100,7 +100,6 @@ public class PosteService {
         poste.setNom(dto.getNom());
         poste.setLongueur(dto.getLongueur());
         poste.setLargeur(dto.getLargeur());
-        poste.setCycleTime(dto.getCycleTime());
         poste.setNombreOperateurs(dto.getNombreOperateurs());
         poste.setQuantite(dto.getQuantite());
         poste.setNombreShifts(dto.getNombreShifts() <= 0 ? 1 : dto.getNombreShifts()); // 💡 AJOUTÉ
@@ -132,7 +131,6 @@ public class PosteService {
                 .nom(p.getNom())
                 .longueur(p.getLongueur())
                 .largeur(p.getLargeur())
-                .cycleTime(p.getCycleTime())
                 .nombreOperateurs(p.getNombreOperateurs())
                 .quantite(p.getQuantite())
                 .statutCouleur(p.getStatutCouleur())
@@ -153,7 +151,6 @@ public class PosteService {
                 .nom(dto.getNom())
                 .longueur(dto.getLongueur())
                 .largeur(dto.getLargeur())
-                .cycleTime(dto.getCycleTime())
                 .nombreOperateurs(dto.getNombreOperateurs())
                 .quantite(dto.getQuantite())
                 .statutCouleur(dto.getStatutCouleur())

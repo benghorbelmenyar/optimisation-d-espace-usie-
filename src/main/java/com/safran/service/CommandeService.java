@@ -7,7 +7,7 @@ import com.safran.entity.BesoinCommande;
 import com.safran.entity.Usine;
 import com.safran.entity.Processus;
 import com.safran.entity.Programme; // <-- Import de ton entité Programme
-import com.safran.enums.StatutCommande;
+import com.safran.entity.StatutCommande;
 import com.safran.repository.CommandeRepository;
 import com.safran.repository.UsineRepository;
 import com.safran.repository.ProcessusRepository;

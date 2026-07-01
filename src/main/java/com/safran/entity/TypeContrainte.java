@@ -1,4 +1,4 @@
-package com.safran.enums;
+package com.safran.entity;
 
 public enum TypeContrainte {
     DISTANCE,

@@ -1,20 +1,26 @@
 package com.safran.dto;
 
-import com.safran.enums.StatutCouleur;
-import lombok.*;
+import com.safran.entity.StatutCouleur;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class PosteDTO {
     private Long id;
     private Long usineId;
-    private String nom;
-    private float longueur;
-    private float largeur;
-    private float cycleTime;
-    private int nombreOperateurs;
-    private int quantite;
-    private StatutCouleur statutCouleur;
-    private double capacite;
     private Long programmeId;
-    private int nombreShifts;
+    private String nom;
+    private Float longueur;
+    private Float largeur;
+    private Integer quantite;
+    private StatutCouleur statutCouleur;
+    private Integer nombreShifts;
+
+    // 💡 AJOUTER CE CHAMP S'IL EST MANQUANT OU CORRIGER L'ORTHOGRAPHE
+    private Integer nombreOperateurs;
 }

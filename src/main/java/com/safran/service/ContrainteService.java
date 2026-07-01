@@ -3,7 +3,7 @@ package com.safran.service;
 import com.safran.dto.ContrainteDTO;
 import com.safran.entity.Contrainte;
 import com.safran.entity.Poste;
-import com.safran.enums.TypeContrainte;
+import com.safran.entity.TypeContrainte;
 import com.safran.repository.ContrainteRepository;
 import com.safran.repository.PosteRepository; // 👈 Requis pour les vérifications
 import lombok.RequiredArgsConstructor;

@@ -1,6 +1,6 @@
 package com.safran.dto;
 
-import com.safran.enums.RoleUtilisateur;
+import com.safran.entity.RoleUtilisateur;
 import lombok.*;
 import java.time.LocalDate;
 import javax.validation.constraints.NotBlank;
